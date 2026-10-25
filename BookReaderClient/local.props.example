@@ -1,0 +1,14 @@
+<!--
+  Личные настройки сборки. Скопируйте этот файл в local.props (в этой же папке) и поправьте под себя.
+  local.props не публикуется (.gitignore).
+-->
+<Project>
+  <PropertyGroup>
+    <!-- Папка web сервера BookReader, если она не лежит рядом (../../BookReader/web) -->
+    <!-- <WebUiDir>D:\Projects\BookReader\web</WebUiDir> -->
+
+    <!-- Свой идентификатор приложения. Нужен, если у вас уже установлена сборка с другим идентификатором:
+         с тем же идентификатором (и тем же ключом подписи) новая версия встанет поверх старой и сохранит библиотеку. -->
+    <!-- <ApplicationId>com.example.bookreader</ApplicationId> -->
+  </PropertyGroup>
+</Project>

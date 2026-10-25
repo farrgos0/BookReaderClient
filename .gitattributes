@@ -1,0 +1,19 @@
+# окончания строк: в репозитории — LF, на Windows при выгрузке — как нужно каждому типу файлов
+* text=auto
+# cmd и Windows PowerShell 5.1 надёжно работают только с CRLF
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+# проекты Visual Studio
+*.sln   text eol=crlf
+*.slnx  text eol=crlf
+*.csproj text eol=crlf
+# двоичные — без преобразований
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.ttf  binary
+*.otf  binary
+*.svg  text
+*.apk  binary
+*.keystore binary

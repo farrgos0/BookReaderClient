@@ -1,0 +1,21 @@
+# сборка
+bin/
+obj/
+dist/
+*.apk
+*.aab
+
+# Visual Studio / Rider — личные файлы
+.vs/
+.idea/
+*.user
+*.suo
+
+# личные настройки сборки (пути, свой идентификатор) — образец: local.props.example
+**/local.props
+
+# ключи подписи: храните вне репозитория (build-apk кладёт их в %USERPROFILE%\BookReader-keys)
+*.keystore
+*.jks
+*.pfx
+*.snk

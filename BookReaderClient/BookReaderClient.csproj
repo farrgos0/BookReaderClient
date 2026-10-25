@@ -1,0 +1,72 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Личные настройки сборки (путь к веб-части, свой идентификатор приложения) — в local.props рядом с проектом.
+       Файл не публикуется (.gitignore); образец — local.props.example. -->
+  <Import Project="$(MSBuildThisFileDirectory)local.props" Condition="Exists('$(MSBuildThisFileDirectory)local.props')" />
+
+  <PropertyGroup>
+    <TargetFrameworks>net10.0-android</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+
+    <OutputType>Exe</OutputType>
+    <RootNamespace>BookReaderClient</RootNamespace>
+    <UseMaui>true</UseMaui>
+    <SingleProject>true</SingleProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <ApplicationTitle>BookReader</ApplicationTitle>
+    <ApplicationId Condition="'$(ApplicationId)' == ''">io.github.bookreader.client</ApplicationId>
+    <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
+    <ApplicationVersion>10000</ApplicationVersion>
+
+    <!-- Windows: обычный exe без MSIX-упаковки -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <!-- Android: в Release собираем .apk (а не .aab для Google Play) -->
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <!-- релизный APK — только для реальных телефонов (ARM): файл заметно меньше. Отладка в эмуляторе (x64) не затронута -->
+    <RuntimeIdentifiers Condition="'$(Configuration)' == 'Release' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">android-arm64;android-arm</RuntimeIdentifiers>
+
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+    <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+
+    <!-- Не сохранять в сборке путь к папке проекта (C:\Users\<имя>\...): в DLL внутри APK
+         попадает путь к .pdb — с PathMap там будет нейтральный /_/ -->
+    <PathMap>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)'))=/_/</PathMap>
+
+    <!-- мост JS ↔ C# и SQLite работают через System.Text.Json с отражением -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+
+    <!-- Веб-интерфейс читалки берётся прямо из папки сервера — одна копия на всё.
+         По умолчанию — соседняя папка с сервером (BookReader или FB2Reader рядом с BookReaderClient).
+         Другой путь: local.props или dotnet build -p:WebUiDir=путь\к\web -->
+    <WebUiDir Condition="'$(WebUiDir)' == '' and Exists('$(MSBuildThisFileDirectory)..\..\BookReader\web\index.html')">$(MSBuildThisFileDirectory)..\..\BookReader\web</WebUiDir>
+    <WebUiDir Condition="'$(WebUiDir)' == '' and Exists('$(MSBuildThisFileDirectory)..\..\FB2Reader\web\index.html')">$(MSBuildThisFileDirectory)..\..\FB2Reader\web</WebUiDir>
+    <WebUiDir Condition="'$(WebUiDir)' == ''">$(MSBuildThisFileDirectory)..\..\BookReader\web</WebUiDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#B4532A" />
+    <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#F4EFE4" BaseSize="128,128" />
+    <!-- index.html, app.js, pdf.js и т.д. → wwwroot внутри приложения (HybridWebView) -->
+    <!-- *.mjs — дубли pdf.js (читалка грузит *.min.js), в приложение не кладём: минус ~1,8 МБ -->
+    <MauiAsset Include="$(WebUiDir)\**\*" Exclude="$(WebUiDir)\**\*.mjs" LogicalName="wwwroot\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+    <!-- sqlite-net без встроенной зависимости от bundle_green (тот застрял на 2.1.11 с уязвимым SQLite) -->
+    <PackageReference Include="sqlite-net-base" Version="1.9.172" />
+    <!-- 2.1.12+ — SQLite с исправлением CVE-2025-6965 (GHSA-2m69-gcr7-jv3q) -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.14" />
+    <!-- декодер Opus на чистом C#: скачанная озвучка хранится в Ogg Opus 32 кбит/с -->
+    <PackageReference Include="Concentus" Version="2.2.2" />
+  </ItemGroup>
+
+  <Target Name="CheckWebUi" BeforeTargets="PrepareForBuild" Condition="!Exists('$(WebUiDir)\index.html')">
+    <Error Text="Не найден веб-интерфейс читалки: $(WebUiDir)\index.html. Положите папку сервера BookReader рядом с BookReaderClient или укажите путь к её папке web в local.props (см. local.props.example) либо: dotnet build -p:WebUiDir=путь" />
+  </Target>
+
+</Project>
