@@ -213,10 +213,24 @@ if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 # полный вывод dotnet дублируется в dist\build-last.log (пароль туда не попадает — он передаётся через переменную окружения)
 New-Item -ItemType Directory -Force -Path $Dist | Out-Null
 $log = Join-Path $Dist "build-last.log"
-Native { & dotnet publish $Proj -f net10.0-android -c Release -o $out `
-    -p:AndroidKeyStore=true "-p:AndroidSigningKeyStore=$Store" "-p:AndroidSigningKeyAlias=$Alias" `
-    "-p:AndroidSigningKeyPass=env:BR_KEYPASS" "-p:AndroidSigningStorePass=env:BR_KEYPASS" 2>&1 | Lines | Tee-Object -FilePath $log | ForEach-Object { Write-Host $_ } }
-$rc = $LASTEXITCODE
+# Visual Studio восстанавливает пакеты для отладки (без android-arm/arm64) и держит это в obj —
+# с таким obj выпуск падает с NETSDK1047. Поэтому перед выпуском — чистое восстановление для Release.
+$objDir = Join-Path $Repo "BookReaderClient\obj"
+function Publish-Apk {
+    Native { & dotnet restore $Proj -p:Configuration=Release --force-evaluate 2>&1 | Lines | Tee-Object -FilePath $log | ForEach-Object { Write-Host $_ } }
+    if ($LASTEXITCODE -ne 0) { return $LASTEXITCODE }
+    Native { & dotnet publish $Proj -f net10.0-android -c Release -o $out --no-restore `
+        -p:AndroidKeyStore=true "-p:AndroidSigningKeyStore=$Store" "-p:AndroidSigningKeyAlias=$Alias" `
+        "-p:AndroidSigningKeyPass=env:BR_KEYPASS" "-p:AndroidSigningStorePass=env:BR_KEYPASS" 2>&1 | Lines | Tee-Object -FilePath $log -Append | ForEach-Object { Write-Host $_ } }
+    return $LASTEXITCODE
+}
+$rc = Publish-Apk
+if ($rc -ne 0 -and (Select-String -Path $log -Pattern "NETSDK1047|project\.assets\.json" -Quiet)) {
+    Write-Host ""
+    Write-Host "Промежуточные файлы сборки устарели — удаляю obj и собираю заново…" -ForegroundColor Yellow
+    Remove-Item $objDir -Recurse -Force -ErrorAction SilentlyContinue
+    $rc = Publish-Apk
+}
 Remove-Item Env:BR_KEYPASS -ErrorAction SilentlyContinue
 if ($rc -ne 0) {
     # ошибки — ещё раз внизу, чтобы не искать их в длинном выводе
