@@ -19,3 +19,7 @@ dist/
 *.jks
 *.pfx
 *.snk
+
+# личные скрипты синхронизации с GitHub
+git-sync.bat
+git-commit.bat
