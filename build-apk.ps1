@@ -217,7 +217,9 @@ $log = Join-Path $Dist "build-last.log"
 # с таким obj выпуск падает с NETSDK1047. Поэтому перед выпуском — чистое восстановление для Release.
 $objDir = Join-Path $Repo "BookReaderClient\obj"
 function Publish-Apk {
-    Native { & dotnet restore $Proj -p:Configuration=Release --force-evaluate 2>&1 | Lines | Tee-Object -FilePath $log | ForEach-Object { Write-Host $_ } }
+    # TargetFramework — обязательно: RuntimeIdentifiers (android-arm64;android-arm) в проекте заданы только для
+    # Android-сборки Release, и без него восстановление их не видит (тот же NETSDK1047)
+    Native { & dotnet restore $Proj -p:Configuration=Release -p:TargetFramework=net10.0-android --force-evaluate 2>&1 | Lines | Tee-Object -FilePath $log | ForEach-Object { Write-Host $_ } }
     if ($LASTEXITCODE -ne 0) { return $LASTEXITCODE }
     Native { & dotnet publish $Proj -f net10.0-android -c Release -o $out --no-restore `
         -p:AndroidKeyStore=true "-p:AndroidSigningKeyStore=$Store" "-p:AndroidSigningKeyAlias=$Alias" `
