@@ -234,6 +234,11 @@ if ($rc -ne 0 -and (Select-String -Path $log -Pattern "NETSDK1047|project\.asset
     $rc = Publish-Apk
 }
 Remove-Item Env:BR_KEYPASS -ErrorAction SilentlyContinue
+# восстановление выше оставило в obj пакеты только для Android Release — Visual Studio с таким obj падает
+# с NETSDK1047 (нет net10.0-android / net10.0-windows). Возвращаем obj в обычный вид для VS.
+Write-Host "Восстанавливаю пакеты для Visual Studio…"
+Native { & dotnet restore $Proj --force-evaluate 2>&1 | Lines | Tee-Object -FilePath $log -Append | Out-Null }
+if ($LASTEXITCODE -ne 0) { Write-Host "  не вышло — в Visual Studio: правой кнопкой по решению → «Восстановить пакеты NuGet»" -ForegroundColor Yellow }
 if ($rc -ne 0) {
     # ошибки — ещё раз внизу, чтобы не искать их в длинном выводе
     $errs = @(Get-Content $log -ErrorAction SilentlyContinue | Where-Object { $_ -match '(?i)\berror\b\s*[A-Z]*\d*\s*:' } | Select-Object -Unique -First 15)
