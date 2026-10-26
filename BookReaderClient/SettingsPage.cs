@@ -247,7 +247,9 @@ public class SettingsPage : ContentPage
             if (m.StartsWith("проверено")) SetStatus("Ищу сервер: " + m, Colors.Gray);
         });
         List<ServerDiscovery.Found> found;
-        try { found = await ServerDiscovery.FindAsync(progress, cts.Token); }
+        // поиск — целиком в фоновом потоке: при отмене (нажали «Найти заново», сменили сеть) тысячи проверок
+        // адресов завершаются разом, и их продолжения не должны выполняться в потоке интерфейса — иначе он замирает
+        try { found = await Task.Run(() => ServerDiscovery.FindAsync(progress, cts.Token), cts.Token); }
         catch (OperationCanceledException) { return; } // поиск перезапустили или ушли со страницы
         catch (Exception ex)
         {

@@ -22,6 +22,9 @@ public class MainPage : ContentPage
         };
         web.SetInvokeJavaScriptTarget(new JsBridge(this));
         Content = web;
+#if ANDROID
+        web.HandlerChanged += (_, _) => ClearWebCacheAfterUpdate();
+#endif
 
         // события нативного плеера → веб-часть (подсветка фразы, кнопка ▶/⏸, ошибки)
         var engine = AppServices.Engine;
@@ -45,6 +48,28 @@ public class MainPage : ContentPage
         // отступы под строку состояния / кнопки навигации Android
         SystemBars.InsetsChanged += t => Padding = t;
     }
+
+#if ANDROID
+    /// <summary>
+    /// Приложение обновили (новый APK или новая сборка из Visual Studio) — сбрасываем кэш WebView,
+    /// чтобы веб-часть (app.js, pron.js…) не осталась от прошлой версии.
+    /// </summary>
+    void ClearWebCacheAfterUpdate()
+    {
+        try
+        {
+            if (web.Handler?.PlatformView is not Android.Webkit.WebView wv) return;
+            var ctx = Android.App.Application.Context;
+            var info = ctx.PackageManager?.GetPackageInfo(ctx.PackageName ?? "", 0);
+            var stamp = info?.LastUpdateTime ?? 0;
+            if (stamp == 0 || Preferences.Default.Get("web_cache_stamp", 0L) == stamp) return;
+            wv.ClearCache(true);
+            Preferences.Default.Set("web_cache_stamp", stamp);
+            DevLog.Write("приложение обновлено — кэш веб-части сброшен");
+        }
+        catch (Exception ex) { CrashLog.Write("MainPage.ClearWebCache", ex); }
+    }
+#endif
 
     bool themeDark;
 
