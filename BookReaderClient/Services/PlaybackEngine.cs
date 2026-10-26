@@ -220,6 +220,15 @@ public sealed class PlaybackEngine
         if (playing) Play(index);
     }
 
+    /// <summary>Изменились личные правила произношения: полученную озвучку берём заново.</summary>
+    public void PronChanged()
+    {
+        CancellationTokenSource old;
+        lock (sync) { old = RenewToken(); ClearCache(); }
+        CancelOld(old);
+        if (playing) Play(index);
+    }
+
     public void Configure(string? v, string? r)
     {
         if (!string.IsNullOrWhiteSpace(v) && v != voice)
@@ -380,7 +389,7 @@ public sealed class PlaybackEngine
         {
             try
             {
-                var bytes = await tts.SynthAsync(seg.Text, v, seg.Pause, ct);
+                var bytes = await tts.SynthAsync(seg.Text, v, seg.Pause, ct, bookId: book);
                 ct.ThrowIfCancellationRequested();      // ответ опоздал — книга уже другая, файл не пишем
                 var tmp = path + ".part";
                 await File.WriteAllBytesAsync(tmp, bytes, CancellationToken.None);

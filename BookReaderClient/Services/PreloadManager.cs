@@ -531,7 +531,7 @@ public sealed class PreloadManager
             {
                 bool live;
                 lock (sync) live = keys.Any(cur.Waiters.ContainsKey); // эти фразы ждёт чтение — сервер даст их вне очереди
-                result = await tts.SynthBatchAsync(items, job.Voice, ct, live);
+                result = await tts.SynthBatchAsync(items, job.Voice, ct, live, job.BookId);
                 break;
             }
             catch (Exception ex) when (!ct.IsCancellationRequested)

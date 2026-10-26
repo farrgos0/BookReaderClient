@@ -82,10 +82,14 @@ public sealed class TtsClient
     }
 
     /// <summary>POST /api/tts — синтез фрагмента, ответ — Ogg Opus (или WAV, если на сервере нет ffmpeg).</summary>
-    public async Task<byte[]> SynthAsync(string text, string speaker, double pause, CancellationToken ct = default, string? baseUrl = null)
+    public async Task<byte[]> SynthAsync(string text, string speaker, double pause, CancellationToken ct = default, string? baseUrl = null,
+        string? bookId = null, System.Text.Json.Nodes.JsonArray? extraRules = null)
     {
         // StringContent — с заголовком Content-Length (JsonContent шлёт потоком без длины)
-        var json = JsonSerializer.Serialize(new { text, speaker, pause, format = "opus" });
+        var req = new System.Text.Json.Nodes.JsonObject { ["text"] = text, ["speaker"] = speaker, ["pause"] = pause, ["format"] = "opus" };
+        PronStore.Attach(req, bookId);                    // личные правила произношения для этой книги
+        if (extraRules != null) req["rules"] = extraRules;  // «прослушать» в окне «Произношение»
+        var json = req.ToJsonString();
         using var body = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
         using var resp = await Http.PostAsync(Url("/api/tts", baseUrl), body, ct);
         await CheckAsync(resp, "/api/tts", ct);
@@ -94,15 +98,19 @@ public sealed class TtsClient
 
     /// <summary>POST /api/tts_batch — пакет фраз. Ответ: для каждой 4 байта длины + файл; null — фраза не удалась.</summary>
     /// <param name="live">фразы нужны для чтения прямо сейчас — сервер ставит их впереди предзагрузки</param>
-    public async Task<List<byte[]?>> SynthBatchAsync(IReadOnlyList<(string Text, double Pause)> items, string speaker, CancellationToken ct = default, bool live = false)
+    public async Task<List<byte[]?>> SynthBatchAsync(IReadOnlyList<(string Text, double Pause)> items, string speaker, CancellationToken ct = default, bool live = false,
+        string? bookId = null)
     {
-        var json = JsonSerializer.Serialize(new
+        var req = new System.Text.Json.Nodes.JsonObject
         {
-            speaker,
-            format = "opus",
-            live,
-            items = items.Select(i => new { text = i.Text, pause = i.Pause }),
-        });
+            ["speaker"] = speaker,
+            ["format"] = "opus",
+            ["live"] = live,
+            ["items"] = new System.Text.Json.Nodes.JsonArray(items.Select(i =>
+                (System.Text.Json.Nodes.JsonNode)new System.Text.Json.Nodes.JsonObject { ["text"] = i.Text, ["pause"] = i.Pause }).ToArray()),
+        };
+        PronStore.Attach(req, bookId);
+        var json = req.ToJsonString();
         using var body = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
         using var resp = await BatchHttp.PostAsync(Url("/api/tts_batch"), body, ct);
         await CheckAsync(resp, "/api/tts_batch", ct);

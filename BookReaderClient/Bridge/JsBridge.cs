@@ -336,6 +336,20 @@ public sealed class JsBridge(MainPage page)
     /// <summary>Флаги приложения (принято соглашение и т. п.) — в настройках устройства, не в WebView.</summary>
     public string? GetPref(string key) => Preferences.Default.Get<string?>("ui_" + key, null);
     public void SetPref(string key, string? value) => Preferences.Default.Set("ui_" + key, value);
+
+    // ---------- личные правила произношения ----------
+    /// <summary>Правила изменились (окно «Произношение» сохранено) — текущую озвучку получаем заново.</summary>
+    public void PronChanged() => Engine.PronChanged();
+
+    /// <summary>«Прослушать» правило: { b64, mime } — фраза озвучкой сервера с этим правилом.</summary>
+    public void PronPreviewAsync(string reqId, string text, string voice, string extraJson) => Run(reqId, async () =>
+    {
+        System.Text.Json.Nodes.JsonArray? rules = null;
+        try { rules = System.Text.Json.Nodes.JsonNode.Parse(extraJson)?["rules"]?.DeepClone() as System.Text.Json.Nodes.JsonArray; } catch { }
+        var bytes = await AppServices.Tts.SynthAsync(text, voice, 0.1, extraRules: rules);
+        var mime = bytes.Length > 4 && bytes[0] == (byte)'O' && bytes[1] == (byte)'g' ? "audio/ogg" : "audio/wav";
+        return JsonSerializer.Serialize(new { b64 = Convert.ToBase64String(bytes), mime });
+    });
     public string HasServer() => AppSettings.HasServer ? "true" : "false";
 
     /// <summary>Закрыть приложение (соглашение не принято).</summary>
