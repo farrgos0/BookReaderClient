@@ -379,6 +379,23 @@ public sealed class JsBridge(MainPage page)
     });
     public string HasServer() => AppSettings.HasServer ? "true" : "false";
 
+    // ---------- обновления (шаг 6) ----------
+    /// <summary>Версия приложения (X.Y.Z) — веб-часть сравнивает её с последним выпуском на GitHub.</summary>
+    public string AppVersion() => AppInfo.Current.VersionString;
+
+    /// <summary>Открыть ссылку во внешнем браузере (скачать APK, страница выпуска). Только GitHub.</summary>
+    public void OpenUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || u.Scheme != Uri.UriSchemeHttps ||
+            !(u.Host == "github.com" || u.Host.EndsWith(".github.com", StringComparison.Ordinal)))
+            throw new InvalidOperationException("открываются только ссылки на GitHub");
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            try { await Launcher.Default.OpenAsync(u); }
+            catch (Exception ex) { DevLog.Write("не открылась ссылка: " + ex.Message); }
+        });
+    }
+
     /// <summary>Закрыть приложение (соглашение не принято).</summary>
     public void ExitApp() => MainThread.BeginInvokeOnMainThread(() => Application.Current?.Quit());
 
