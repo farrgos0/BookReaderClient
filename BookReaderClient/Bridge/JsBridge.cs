@@ -159,6 +159,7 @@ public sealed class JsBridge(MainPage page)
         queueGate.Wait();
         try { Engine.SetQueue(bookId, title, segs); }
         finally { queueGate.Release(); }
+        AppServices.Preload.CheckLater(bookId, segs);   // не устарела ли скачанная озвучка этой книги
     }
 
     /// <summary>Книга уже присылалась с той же подписью — берём её фразы из памяти. "1" — готово, "0" — пришлите целиком.</summary>
@@ -183,6 +184,7 @@ public sealed class JsBridge(MainPage page)
             if (Engine.BookId != bookId || !ReferenceEquals(Engine.Segments, segs)) Engine.SetQueue(bookId, title, segs);
         }
         finally { queueGate.Release(); }
+        AppServices.Preload.CheckLater(bookId, segs);
         return "1";
     }
 
@@ -281,6 +283,15 @@ public sealed class JsBridge(MainPage page)
     public string PreloadQueue() => AppServices.Preload.QueueJson();
     public void PreloadDelete(string bookId, string? voice) => AppServices.Preload.Delete(bookId, voice);
     public string PreloadStatus() => AppServices.Preload.StatusJson();
+
+    /// <summary>«Обновить» скачанную озвучку открытой книги: заново — устаревшие фразы и скачанные до 1.2.0.
+    /// "1" — обновление поставлено в загрузку, "0" — обновлять нечего.</summary>
+    public string PreloadRefresh(string bookId, string title, string voice)
+    {
+        if (Engine.BookId != bookId || Engine.Segments.Count == 0)
+            throw new InvalidOperationException("книга не открыта в плеере — откройте её и повторите");
+        return AppServices.Preload.Refresh(bookId, title, voice, Engine.Segments) ? "1" : "0";
+    }
     /// <summary>
     /// Сколько фраз каждой главы скачано голосом voice: starts — номера первых фраз глав (JSON-массив).
     /// Ответ: [[скачано, всего], ...] по главам. Текст до первой главы относится к первой.
@@ -339,7 +350,11 @@ public sealed class JsBridge(MainPage page)
 
     // ---------- личные правила произношения ----------
     /// <summary>Правила изменились (окно «Произношение» сохранено) — текущую озвучку получаем заново.</summary>
-    public void PronChanged() => Engine.PronChanged();
+    public void PronChanged()
+    {
+        Engine.PronChanged();
+        AppServices.Preload.CheckLater(Engine.BookId, Engine.Segments);   // скачанная озвучка могла устареть
+    }
 
     /// <summary>«Прослушать» правило: { b64, mime } — фраза озвучкой сервера с этим правилом.</summary>
     public void PronPreviewAsync(string reqId, string text, string voice, string extraJson) => Run(reqId, async () =>

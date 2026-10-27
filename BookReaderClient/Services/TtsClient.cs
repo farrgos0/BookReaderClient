@@ -98,7 +98,7 @@ public sealed class TtsClient
 
     /// <summary>POST /api/tts_batch — пакет фраз. Ответ: для каждой 4 байта длины + файл; null — фраза не удалась.</summary>
     /// <param name="live">фразы нужны для чтения прямо сейчас — сервер ставит их впереди предзагрузки</param>
-    public async Task<List<byte[]?>> SynthBatchAsync(IReadOnlyList<(string Text, double Pause)> items, string speaker, CancellationToken ct = default, bool live = false,
+    public async Task<BatchResult> SynthBatchAsync(IReadOnlyList<(string Text, double Pause)> items, string speaker, CancellationToken ct = default, bool live = false,
         string? bookId = null)
     {
         var req = new System.Text.Json.Nodes.JsonObject
@@ -126,7 +126,68 @@ public sealed class TtsClient
             pos += len;
         }
         if (result.Count != items.Count) throw new InvalidDataException("ответ сервера обрезан");
-        return result;
+        // отпечатки озвученного текста (сервер 1.2.0+): по ним потом находим устаревшую скачанную озвучку
+        string[]? fps = null;
+        if (resp.Headers.TryGetValues("X-Text-Fp", out var fv))
+        {
+            var parts = string.Join(",", fv).Split(',');
+            if (parts.Length == items.Count) fps = parts;
+        }
+        var norm = resp.Headers.TryGetValues("X-Norm-Version", out var nv) ? nv.FirstOrDefault() : null;
+        return new BatchResult(result, fps, norm);
+    }
+
+    /// <summary>Ответ пакета: озвучка фраз, их отпечатки (null — старый сервер) и версия нормализатора.</summary>
+    public sealed record BatchResult(List<byte[]?> Data, string[]? Fps, string? Norm);
+
+    /// <summary>Версия нормализатора сервера (из /api/ping); null — режим «Без сервера» или сервер до 1.2.0.</summary>
+    public async Task<string?> NormVersionAsync(CancellationToken ct = default)
+    {
+        if (AppSettings.Offline || !AppSettings.HasServer) return null;
+        var (json, _) = await PingAsync(AppSettings.BaseUrl, ct);
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.TryGetProperty("norm", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
+    }
+
+    /// <summary>
+    /// POST /api/text_fp — отпечатки того, что прозвучит для каждой фразы при текущих правилах книги (без озвучки).
+    /// Шлём частями, чтобы запрос не был слишком большим.
+    /// </summary>
+    public async Task<(string Version, string[] Fps)> TextFpAsync(IReadOnlyList<string> texts, string? bookId, CancellationToken ct = default,
+        Action<int, int>? progress = null)
+    {
+        var all = new string[texts.Count];
+        var version = "";
+        var off = 0;
+        while (off < texts.Count)
+        {
+            var arr = new System.Text.Json.Nodes.JsonArray();
+            var chars = 0;
+            var n = 0;
+            while (off + n < texts.Count && n < 1000 && (n == 0 || chars + texts[off + n].Length < 1_000_000))
+            {
+                chars += texts[off + n].Length;
+                arr.Add(texts[off + n]);
+                n++;
+            }
+            var req = new System.Text.Json.Nodes.JsonObject { ["items"] = arr };
+            PronStore.Attach(req, bookId);
+            using var body = new StringContent(req.ToJsonString(), System.Text.Encoding.UTF8, "application/json");
+            using var resp = await BatchHttp.PostAsync(Url("/api/text_fp"), body, ct);
+            await CheckAsync(resp, "/api/text_fp", ct);
+            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
+            version = doc.RootElement.GetProperty("version").GetString() ?? "";
+            var i = 0;
+            foreach (var e in doc.RootElement.GetProperty("fps").EnumerateArray())
+            {
+                if (i < n) all[off + i] = e.GetString() ?? "";
+                i++;
+            }
+            if (i != n) throw new InvalidDataException("ответ сервера обрезан");
+            off += n;
+            progress?.Invoke(off, texts.Count);
+        }
+        return (version, all);
     }
 
     /// <summary>GET /api/catalog — книги из папки catalog на сервере (строка JSON как есть).</summary>

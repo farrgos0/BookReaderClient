@@ -16,9 +16,11 @@ namespace BookReaderClient.Services;
 /// </summary>
 public sealed class PreloadManager
 {
-    /// <summary>Задание: фразы либо в памяти (открытая книга), либо в файле (групповая загрузка — память не занимаем).</summary>
+    /// <summary>Задание: фразы либо в памяти (открытая книга), либо в файле (групповая загрузка — память не занимаем).
+    /// Refresh — уже скачанные фразы, которые надо скачать заново (кнопка «Обновить»: устарели или скачаны до 1.2.0);
+    /// старый файл заменяется только когда пришёл новый. RefreshOnly — только эти фразы, недостающие не докачивать.</summary>
     public sealed record Job(string BookId, string Title, string Voice, IReadOnlyList<PlaybackEngine.Seg>? Segs, int From, int To,
-        string? SegsFile = null);
+        string? SegsFile = null, IReadOnlySet<string>? Refresh = null, bool RefreshOnly = false);
 
     sealed class Live
     {
@@ -34,6 +36,7 @@ public sealed class PreloadManager
         public readonly Dictionary<string, TaskCompletionSource<bool>> Waiters = new();
         public readonly Dictionary<string, (string Text, double Pause)> All = new();
         public CancellationTokenSource Cts = new();
+        public long FpSavedAt = Environment.TickCount64;
     }
 
     public enum NetState { Ok, NoConnection, Reconnected, Held }
@@ -108,7 +111,10 @@ public sealed class PreloadManager
                 {
                     // уже в очереди — объединяем диапазоны
                     var old = queue[same];
-                    queue[same] = job with { From = Math.Min(old.From, job.From), To = Math.Max(old.To, job.To) };
+                    // обычная загрузка + «только обновить» = обычная загрузка (с обновлением)
+                    queue[same] = old.RefreshOnly && !job.RefreshOnly ? job with { Refresh = Union(old.Refresh, job.Refresh) }
+                        : !old.RefreshOnly && job.RefreshOnly ? old with { Refresh = Union(old.Refresh, job.Refresh) }
+                        : job with { From = Math.Min(old.From, job.From), To = Math.Max(old.To, job.To), Refresh = Union(old.Refresh, job.Refresh) };
                 }
                 else queue.Add(job);
                 run = !runnerActive;
@@ -118,6 +124,9 @@ public sealed class PreloadManager
         Notify(job.BookId, force: true);
         if (run) _ = Task.Run(RunAsync); // подсчёт уже загруженного и сеть — не в потоке интерфейса
     }
+
+    static IReadOnlySet<string>? Union(IReadOnlySet<string>? a, IReadOnlySet<string>? b) =>
+        a == null ? b : b == null ? a : a.Concat(b).ToHashSet(StringComparer.Ordinal);
 
     /// <summary>Групповая загрузка: фразы книги пишем в файл, в очереди держим только ссылку.</summary>
     public void Enqueue(string bookId, string title, string voice, List<PlaybackEngine.Seg> segs)
@@ -146,7 +155,9 @@ public sealed class PreloadManager
         for (var i = Math.Max(0, job.From); i < to; i++)
         {
             var k = keys[i];
-            if (cur.PendingKeys.Contains(k) || cur.InFlight.Contains(k) || AudioStore.Has(cur.Job.BookId, cur.Job.Voice, k)) continue;
+            if (job.RefreshOnly && !(job.Refresh?.Contains(k) ?? false)) continue;   // «Обновить» недостающее не докачивает
+            if (cur.PendingKeys.Contains(k) || cur.InFlight.Contains(k)) continue;
+            if (AudioStore.Has(cur.Job.BookId, cur.Job.Voice, k) && !(job.Refresh?.Contains(k) ?? false)) continue;
             cur.All.TryAdd(k, (cur.Segs[i].Text, cur.Segs[i].Pause));
             cur.Pending.Add((i, k));
             cur.PendingKeys.Add(k);
@@ -248,6 +259,11 @@ public sealed class PreloadManager
                 r["jobTotal"] = live.JobTotal;
                 rows[key] = r;
             }
+            foreach (var (key, pct) in checkPct)   // идёт сверка: «проверяю … N%»
+            {
+                if (onlyBook != null && !key.StartsWith(onlyBook + "|")) continue;
+                if (rows.TryGetValue(key, out var r)) r["checking"] = pct;
+            }
             foreach (var (key, err) in errors)
             {
                 if (onlyBook != null && !key.StartsWith(onlyBook + "|")) continue;
@@ -289,11 +305,17 @@ public sealed class PreloadManager
         }
     }
 
-    static Dictionary<string, object?> Row(string bookId, string voice, int total, int done, long bytes) => new()
+    static Dictionary<string, object?> Row(string bookId, string voice, int total, int done, long bytes)
     {
-        ["bookId"] = bookId, ["voice"] = voice, ["total"] = total, ["done"] = done, ["bytes"] = bytes,
-        ["running"] = false, ["queued"] = false, ["paused"] = false, ["jobDone"] = 0, ["jobTotal"] = 0, ["error"] = null,
-    };
+        // ждут обновления: stale — устарели (сверка), unknown — скачаны до 1.2.0 (без отпечатка)
+        var (stale, unknown) = done > 0 ? AudioStore.Outdated(bookId, voice) : (0, 0);
+        return new()
+        {
+            ["bookId"] = bookId, ["voice"] = voice, ["total"] = total, ["done"] = done, ["bytes"] = bytes,
+            ["running"] = false, ["queued"] = false, ["paused"] = false, ["jobDone"] = 0, ["jobTotal"] = 0, ["error"] = null,
+            ["stale"] = stale, ["unknown"] = unknown, ["checking"] = null,
+        };
+    }
 
     // уведомления в интерфейс: не чаще раза в NotifyEvery на книгу (прогресс), смена состояния — сразу
     readonly Dictionary<string, long> lastNotify = new();
@@ -358,7 +380,7 @@ public sealed class PreloadManager
                 }
                 finally
                 {
-                    SavePack(cur);
+                    SavePack(cur, final: true);
                     DropFile(cur.Job);
                     lock (sync)
                     {
@@ -405,9 +427,10 @@ public sealed class PreloadManager
             cur.All.TryAdd(keys[i], (segs[i].Text, segs[i].Pause));
             if (i >= job.From && i < to) ranged.Add((i, keys[i]));
         }
-        var have = cur.All.Keys.Where(k => AudioStore.Has(job.BookId, job.Voice, k)).ToHashSet();
+        // скачанное пропускаем — кроме фраз, которые пользователь велел обновить
+        var have = cur.All.Keys.Where(k => AudioStore.Has(job.BookId, job.Voice, k) && !(job.Refresh?.Contains(k) ?? false)).ToHashSet();
         var seen = new HashSet<string>();
-        var todo = ranged.Where(r => !have.Contains(r.Key) && seen.Add(r.Key)).ToList();
+        var todo = ranged.Where(r => !have.Contains(r.Key) && (!job.RefreshOnly || job.Refresh!.Contains(r.Key)) && seen.Add(r.Key)).ToList();
 
         lock (sync)
         {
@@ -523,7 +546,7 @@ public sealed class PreloadManager
     {
         var job = cur.Job;
         var items = keys.Select(k => cur.All[k]).ToList();
-        List<byte[]?>? result = null;
+        TtsClient.BatchResult? result = null;
         for (var attempt = 0; ; attempt++)
         {
             ct.ThrowIfCancellationRequested();
@@ -564,13 +587,14 @@ public sealed class PreloadManager
         var ok = 0;
         for (var i = 0; i < keys.Length; i++)
         {
-            var data = result![i];
+            var data = result!.Data[i];
             if (data == null) continue;
             var path = AudioStore.PathFor(job.BookId, job.Voice, keys[i]);
             var tmp = path + ".part";
             await File.WriteAllBytesAsync(tmp, data, CancellationToken.None);
             File.Move(tmp, path, true);
             AudioStore.MarkSaved(job.BookId, job.Voice, keys[i]);
+            AudioStore.SetFp(job.BookId, job.Voice, keys[i], result!.Fps?[i]);   // что озвучено — для будущей сверки
             saved.Add(keys[i]);
             added += data.Length;
             ok++;
@@ -629,7 +653,7 @@ public sealed class PreloadManager
         }
     }
 
-    void SavePack(Live cur)
+    void SavePack(Live cur, bool final = false)
     {
         try
         {
@@ -643,7 +667,100 @@ public sealed class PreloadManager
             // папку могли удалить (кнопка «Удалить озвучку») — не воскрешаем её
             if (info.Total > 0 && Directory.Exists(AudioStore.PackDir(cur.Job.BookId, cur.Job.Voice)))
                 AudioStore.WritePack(cur.Job.BookId, info);
+            // отпечатки большой книги — мегабайты: пишем не чаще раза в 20 с и в конце задания
+            if (final || Environment.TickCount64 - cur.FpSavedAt > 20_000)
+            {
+                cur.FpSavedAt = Environment.TickCount64;
+                AudioStore.SaveFps(cur.Job.BookId, cur.Job.Voice);
+            }
         }
         catch { }
+    }
+
+    // ---------- обновление скачанной озвучки (шаг 5 спецификации 1.2.0) ----------
+
+    readonly HashSet<string> checking = new();            // «книга|голос», которые сейчас сверяются
+    readonly Dictionary<string, int> checkPct = new();    // … и сколько процентов фраз уже сверено (для интерфейса)
+
+    /// <summary>
+    /// Сверить скачанную озвучку открытой книги (все голоса) с текущими правилами и нормализатором сервера.
+    /// Только если с прошлой сверки что-то изменилось; результат — отметка «ожидает обновления» в интерфейсе.
+    /// Ничего не скачивает и не удаляет.
+    /// </summary>
+    public void CheckLater(string bookId, IReadOnlyList<PlaybackEngine.Seg> segs)
+    {
+        if (string.IsNullOrEmpty(bookId) || segs.Count == 0) return;
+        _ = Task.Run(async () =>
+        {
+            List<string> voices;
+            try { voices = AudioStore.AllPacks().Where(p => p.BookId == bookId).Select(p => p.Info.Voice).ToList(); }
+            catch { return; }
+            foreach (var v in voices)
+                try { await CheckAsync(bookId, v, segs); }
+                catch (Exception ex) { DevLog.Write($"сверка озвучки {bookId}/{v}: {TtsClient.Friendly(ex)}"); }
+        });
+    }
+
+    async Task CheckAsync(string bookId, string voice, IReadOnlyList<PlaybackEngine.Seg> segs, CancellationToken ct = default)
+    {
+        var id = bookId + "|" + voice;
+        lock (sync)
+        {
+            if (live != null && live.Job.BookId == bookId && live.Job.Voice == voice) return;   // качается — сверим потом
+            if (!checking.Add(id)) return;
+        }
+        try
+        {
+            var norm = await tts.NormVersionAsync(ct);
+            if (string.IsNullOrEmpty(norm)) return;                       // нет сервера или он до 1.2.0
+            var stamp = PronStore.Stamp(bookId);
+            var (oldNorm, oldStamp, fps) = AudioStore.FpSnapshot(bookId, voice);
+            if (fps.Count == 0) return;                                   // отпечатков нет (скачано до 1.2.0) — сверять нечего
+            if (oldNorm == norm && oldStamp == stamp) return;             // с прошлой сверки ничего не менялось
+            var keys = AudioStore.KeysOf(segs);
+            var texts = new List<string>();
+            var order = new List<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < keys.Length; i++)
+                if (fps.ContainsKey(keys[i]) && seen.Add(keys[i])) { order.Add(keys[i]); texts.Add(segs[i].Text); }
+            lock (sync) checkPct[id] = 0;
+            Notify(bookId, force: true);
+            var (version, now) = await tts.TextFpAsync(texts, bookId, ct, (done, total) =>
+            {
+                lock (sync) checkPct[id] = total == 0 ? 100 : done * 100 / total;
+                Notify(bookId);
+            });
+            var stale = new List<string>();
+            for (var i = 0; i < order.Count; i++)
+                if (!string.IsNullOrEmpty(now[i]) && now[i] != fps[order[i]]) stale.Add(order[i]);
+            AudioStore.SetChecked(bookId, voice, string.IsNullOrEmpty(version) ? norm : version, stamp, stale);
+            DevLog.Write($"сверка озвучки {bookId}/{voice}: фраз {order.Count}, устарело {stale.Count}");
+        }
+        finally
+        {
+            bool shown;
+            lock (sync) { checking.Remove(id); shown = checkPct.Remove(id); }
+            if (shown) Notify(bookId, force: true);
+        }
+    }
+
+    /// <summary>
+    /// «Обновить»: скачать заново устаревшие фразы и фразы без отпечатка (скачаны до 1.2.0). Пока не пришла новая,
+    /// играет старая. Фразы, которых в книге больше нет, удаляются. false — обновлять нечего.
+    /// </summary>
+    public bool Refresh(string bookId, string title, string voice, IReadOnlyList<PlaybackEngine.Seg> segs)
+    {
+        var outdated = AudioStore.OutdatedKeys(bookId, voice);
+        if (outdated.Count == 0) return false;
+        var inBook = AudioStore.KeysOf(segs).ToHashSet(StringComparer.Ordinal);
+        foreach (var k in outdated.Where(k => !inBook.Contains(k)).ToList())
+        {
+            AudioStore.RemovePhrase(bookId, voice, k);
+            outdated.Remove(k);
+        }
+        AudioStore.SaveFps(bookId, voice);
+        if (outdated.Count == 0) { Notify(bookId, force: true); return false; }
+        Start(new Job(bookId, title, voice, segs, 0, segs.Count, null, outdated, RefreshOnly: true));
+        return true;
     }
 }
