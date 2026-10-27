@@ -216,9 +216,19 @@ public sealed class JsBridge(MainPage page)
     /// <summary>Режим «Без сервера»: true — не ходить в сеть, читать только скачанное.</summary>
     public void SetOffline(string on)
     {
-        AppSettings.Offline = on == "true";
+        AppSettings.Mode = on == "true" ? "offline" : "online";
         if (AppSettings.Offline) AppServices.Preload.CancelAll();
     }
+
+    /// <summary>Режим работы: online | offline | autonomous (см. AppSettings.Mode).</summary>
+    public void SetMode(string mode)
+    {
+        AppSettings.Mode = mode;
+        if (AppSettings.Offline) AppServices.Preload.CancelAll();
+        if (AppSettings.Autonomous) Engine.Stop();   // нейроозвучки в автономном режиме нет
+    }
+
+    public string GetMode() => AppSettings.Mode;
 
     public string GetOffline() => AppSettings.Offline ? "true" : "false";
 

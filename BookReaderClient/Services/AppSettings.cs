@@ -22,6 +22,28 @@ public static class AppSettings
         set => Preferences.Default.Set("offline", value);
     }
 
+    /// <summary>
+    /// Режим работы: "online" — с сервером озвучки; "offline" — без сервера, только скачанная озвучка;
+    /// "autonomous" — автономный режим (шаг 7): только чтение (и готовые аудиокниги, шаг 8), нейроозвучки нет,
+    /// в сеть не ходим. «Без сервера» и «автономный» оба выключают сеть (Offline = true).
+    /// </summary>
+    public static string Mode
+    {
+        get
+        {
+            var m = Preferences.Default.Get("mode", "");
+            return m is "online" or "offline" or "autonomous" ? m : (Offline ? "offline" : "online");
+        }
+        set
+        {
+            var m = value is "offline" or "autonomous" ? value : "online";
+            Preferences.Default.Set("mode", m);
+            Offline = m != "online";
+        }
+    }
+
+    public static bool Autonomous => Mode == "autonomous";
+
     /// <summary>Базовый адрес вида http://адрес:8765 (без завершающего «/»).</summary>
     public static string BaseUrl => NormalizeBaseUrl(Server);
 
