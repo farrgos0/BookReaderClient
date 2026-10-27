@@ -157,7 +157,7 @@ public sealed class PreloadManager
             var k = keys[i];
             if (job.RefreshOnly && !(job.Refresh?.Contains(k) ?? false)) continue;   // «Обновить» недостающее не докачивает
             if (cur.PendingKeys.Contains(k) || cur.InFlight.Contains(k)) continue;
-            if (AudioStore.Has(cur.Job.BookId, cur.Job.Voice, k) && !(job.Refresh?.Contains(k) ?? false)) continue;
+            if (AudioStore.Existing(cur.Job.BookId, cur.Job.Voice, cur.Segs[i].Text, cur.Segs[i].Pause, k) != null && !(job.Refresh?.Contains(k) ?? false)) continue;
             cur.All.TryAdd(k, (cur.Segs[i].Text, cur.Segs[i].Pause));
             cur.Pending.Add((i, k));
             cur.PendingKeys.Add(k);
@@ -428,7 +428,9 @@ public sealed class PreloadManager
             if (i >= job.From && i < to) ranged.Add((i, keys[i]));
         }
         // скачанное пропускаем — кроме фраз, которые пользователь велел обновить
-        var have = cur.All.Keys.Where(k => AudioStore.Has(job.BookId, job.Voice, k) && !(job.Refresh?.Contains(k) ?? false)).ToHashSet();
+        // (фраза с тем же текстом, но другой паузой — тоже скачана: см. AudioStore.Existing)
+        var have = cur.All.Where(p => AudioStore.Existing(job.BookId, job.Voice, p.Value.Text, p.Value.Pause, p.Key) != null
+            && !(job.Refresh?.Contains(p.Key) ?? false)).Select(p => p.Key).ToHashSet();
         var seen = new HashSet<string>();
         var todo = ranged.Where(r => !have.Contains(r.Key) && (!job.RefreshOnly || job.Refresh!.Contains(r.Key)) && seen.Add(r.Key)).ToList();
 
@@ -595,6 +597,7 @@ public sealed class PreloadManager
             File.Move(tmp, path, true);
             AudioStore.MarkSaved(job.BookId, job.Voice, keys[i]);
             AudioStore.SetFp(job.BookId, job.Voice, keys[i], result!.Fps?[i]);   // что озвучено — для будущей сверки
+            if (job.Refresh?.Contains(keys[i]) ?? false) AudioStore.RemoveAliases(job.BookId, job.Voice, items[i].Text, items[i].Pause);
             saved.Add(keys[i]);
             added += data.Length;
             ok++;
@@ -815,7 +818,10 @@ public sealed class PreloadManager
             var order = new List<string>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
             for (var i = 0; i < keys.Length; i++)
-                if (fps.ContainsKey(keys[i]) && seen.Add(keys[i])) { order.Add(keys[i]); texts.Add(segs[i].Text); }
+            {
+                var k = AudioStore.Existing(bookId, voice, segs[i].Text, segs[i].Pause, keys[i]);   // файл фразы (пауза могла смениться)
+                if (k != null && fps.ContainsKey(k) && seen.Add(k)) { order.Add(k); texts.Add(segs[i].Text); }
+            }
             lock (sync) checkPct[id] = 0;
             Notify(bookId, force: true);
             var (version, now) = await tts.TextFpAsync(texts, bookId, ct, (done, total) =>
@@ -845,15 +851,22 @@ public sealed class PreloadManager
     {
         var outdated = AudioStore.OutdatedKeys(bookId, voice);
         if (outdated.Count == 0) return false;
-        var inBook = AudioStore.KeysOf(segs).ToHashSet(StringComparer.Ordinal);
-        foreach (var k in outdated.Where(k => !inBook.Contains(k)).ToList())
+        // файл фразы может лежать под ключом с другой паузой (см. AudioStore.Existing): обновляем по ключу фразы книги,
+        // старый вариант удаляется, когда придёт новый
+        var keys = AudioStore.KeysOf(segs);
+        var inBook = new HashSet<string>(StringComparer.Ordinal);
+        var refresh = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < segs.Count; i++)
         {
-            AudioStore.RemovePhrase(bookId, voice, k);
-            outdated.Remove(k);
+            var file = AudioStore.Existing(bookId, voice, segs[i].Text, segs[i].Pause, keys[i]);
+            if (file == null) continue;
+            inBook.Add(file);
+            if (outdated.Contains(file)) refresh.Add(keys[i]);
         }
+        foreach (var k in outdated.Where(k => !inBook.Contains(k)).ToList()) AudioStore.RemovePhrase(bookId, voice, k);   // фраз больше нет в книге
         AudioStore.SaveFps(bookId, voice);
-        if (outdated.Count == 0) { Notify(bookId, force: true); return false; }
-        Start(new Job(bookId, title, voice, segs, 0, segs.Count, null, outdated, RefreshOnly: true));
+        if (refresh.Count == 0) { Notify(bookId, force: true); return false; }
+        Start(new Job(bookId, title, voice, segs, 0, segs.Count, null, refresh, RefreshOnly: true));
         return true;
     }
 }

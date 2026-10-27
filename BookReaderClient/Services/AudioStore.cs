@@ -242,6 +242,45 @@ public static class AudioStore
 
     public static string? Find(string bookId, string voice, string text, double pause) => Find(bookId, voice, Key(text, pause));
 
+    // Паузы, которые веб-часть ставит после фраз (app.js, buildBook): внутри абзаца, конец абзаца, заголовок и т. д.
+    static readonly double[] KnownPauses = [0.12, 0.35, 0.9, 0.6, 0.25, 0.8];
+
+    /// <summary>
+    /// Ключ скачанной фразы с этим текстом: точный (текст + пауза), а если его нет — тот же текст с другой паузой.
+    /// Пауза меняется, когда меняется вид абзаца (например, разметка глав сделала строку заголовком: 0,35 → 0,9 с),
+    /// а звучит фраза так же — отличается только тишина после неё. null — фраза не скачана.
+    /// </summary>
+    public static string? Existing(string bookId, string voice, string text, double pause, string? exact = null)
+    {
+        exact ??= Key(text, pause);
+        if (Has(bookId, voice, exact)) return exact;
+        foreach (var p in KnownPauses)
+        {
+            if (Math.Abs(p - Math.Round(pause, 2)) < 0.001) continue;
+            var k = Key(text, p);
+            if (Has(bookId, voice, k)) return k;
+        }
+        return null;
+    }
+
+    /// <summary>Файл скачанной фразы (с учётом другой паузы, см. Existing) или null.</summary>
+    public static string? FindSeg(string bookId, string voice, string text, double pause, string exact)
+    {
+        var k = Existing(bookId, voice, text, pause, exact);
+        return k == null ? null : Find(bookId, voice, k);
+    }
+
+    /// <summary>Фраза скачана заново с точной паузой — убрать её прежние варианты с другой паузой.</summary>
+    public static void RemoveAliases(string bookId, string voice, string text, double pause)
+    {
+        foreach (var p in KnownPauses)
+        {
+            if (Math.Abs(p - Math.Round(pause, 2)) < 0.001) continue;
+            var k = Key(text, p);
+            if (Has(bookId, voice, k)) RemovePhrase(bookId, voice, k);
+        }
+    }
+
     public static PackInfo? ReadPack(string bookId, string voice)
     {
         try
