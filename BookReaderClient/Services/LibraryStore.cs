@@ -26,6 +26,8 @@ public class BookRow
     public bool CustomMeta { get; set; }
     /// <summary>Найденные автоматически главы (JSON от веб-части) — null, если не искали.</summary>
     public string? Chapters { get; set; }
+    /// <summary>Избранное (звёздочка в библиотеке). Столбец добавляется в старую базу сам (CreateTable).</summary>
+    public bool Favorite { get; set; }
 }
 
 /// <summary>Библиотека на устройстве: SQLite + файлы. Без синхронизации.</summary>
@@ -146,6 +148,7 @@ public sealed class LibraryStore
                     case "openedAt": r.OpenedAt = (long)Num(v); break;
                     case "customMeta": r.CustomMeta = v?.GetValue<bool>() ?? false; break;
                     case "chapters": r.Chapters = v?.ToJsonString(); break;
+                    case "favorite": r.Favorite = v?.GetValue<bool>() ?? false; break;
                 }
             }
             Db.Update(r);
@@ -316,6 +319,7 @@ public sealed class LibraryStore
         id = r.Id, title = r.Title, authors = ParseAuthors(r.AuthorsJson), format = r.Format, formatLabel = r.FormatLabel,
         name = r.Name, size = r.Size, addedAt = r.AddedAt, openedAt = r.OpenedAt, pos = r.Pos, segCount = r.SegCount,
         progress = r.Progress, cover = r.Cover, customMeta = r.CustomMeta, chapters = ParseNode(r.Chapters),
+        favorite = r.Favorite,
     };
 
     static JsonNode? ParseNode(string? json)
