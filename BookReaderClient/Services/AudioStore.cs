@@ -290,6 +290,59 @@ public static class AudioStore
         catch { return 0; }
     }
 
+    // ---------- «Освободить место» (настройки) ----------
+
+    static long FileSize(string p) { try { return new FileInfo(p).Length; } catch { return 0; } }
+
+    /// <summary>Папки книг со скачанной озвучкой (их имена — номера книг).</summary>
+    public static List<string> BookIds()
+    {
+        try { return Directory.GetDirectories(Root).Select(d => Path.GetFileName(d)!).ToList(); }
+        catch { return []; }
+    }
+
+    public static List<string> VoicesOf(string bookId)
+    {
+        try { return Directory.Exists(BookDir(bookId)) ? Directory.GetDirectories(BookDir(bookId)).Select(d => Path.GetFileName(d)!).ToList() : []; }
+        catch { return []; }
+    }
+
+    public static long BookBytes(string bookId)
+    {
+        try { return Directory.Exists(BookDir(bookId)) ? new DirectoryInfo(BookDir(bookId)).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length) : 0; }
+        catch { return 0; }
+    }
+
+    /// <summary>Устаревшие фразы набора и их размер: (ключи, байты).</summary>
+    public static (List<string> Keys, long Bytes) OutdatedFiles(string bookId, string voice)
+    {
+        var keys = OutdatedKeys(bookId, voice).ToList();
+        return (keys, keys.Sum(k => FileSize(PathFor(bookId, voice, k))));
+    }
+
+    /// <summary>Недописанные файлы (.part, .tmp) — остались после обрыва.</summary>
+    public static List<string> PartFiles()
+    {
+        try
+        {
+            return Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories)
+                .Where(f => f.EndsWith(".part", StringComparison.Ordinal) || f.EndsWith(".tmp", StringComparison.Ordinal)).ToList();
+        }
+        catch { return []; }
+    }
+
+    /// <summary>Пересчитать статистику набора после удаления фраз.</summary>
+    public static void Recount(string bookId, string voice)
+    {
+        var info = ReadPack(bookId, voice);
+        if (info == null) return;
+        int n;
+        lock (idxLock) n = Index(bookId, voice).Count;
+        info.Done = Math.Min(n, info.Total > 0 ? info.Total : n);
+        info.Bytes = DirSize(PackDir(bookId, voice));
+        WritePack(bookId, info);
+    }
+
     public static void DeletePack(string bookId, string voice) { TryDeleteDir(PackDir(bookId, voice)); ForgetIndex(PackDir(bookId, voice)); }
     public static void DeleteBook(string bookId) { TryDeleteDir(BookDir(bookId)); ForgetIndex(BookDir(bookId)); }
     public static void DeleteAll() { TryDeleteDir(Root); ForgetIndex(""); }

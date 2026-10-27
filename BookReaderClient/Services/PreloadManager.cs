@@ -677,6 +677,99 @@ public sealed class PreloadManager
         catch { }
     }
 
+    // ---------- «Освободить место» (настройки) ----------
+
+    /// <summary>Что можно удалить: озвучка книг, которых нет в библиотеке; старый вариант фраз, ожидающих обновления;
+    /// недописанные и временные файлы; всё вместе. Ничего не удаляет.</summary>
+    public string CleanupInfo(HashSet<string> library)
+    {
+        long orphan = 0, outdated = 0, temp = 0;
+        int orphanBooks = 0, outdatedPhrases = 0;
+        foreach (var b in AudioStore.BookIds())
+        {
+            if (!library.Contains(b)) { orphan += AudioStore.BookBytes(b); orphanBooks++; continue; }
+            foreach (var v in AudioStore.VoicesOf(b))
+            {
+                if (Busy(b, v)) continue;
+                var (keys, bytes) = AudioStore.OutdatedFiles(b, v);
+                outdatedPhrases += keys.Count;
+                outdated += bytes;
+            }
+        }
+        foreach (var f in TempFiles()) try { temp += new FileInfo(f).Length; } catch { }
+        return JsonSerializer.Serialize(new
+        {
+            orphanBytes = orphan, orphanBooks, outdatedBytes = outdated, outdatedPhrases, tempBytes = temp,
+            totalBytes = AudioStore.TotalBytes(), busy = IsActive,
+        });
+    }
+
+    /// <summary>Удалить выбранное. Озвучку, которая сейчас качается, не трогаем. → { freed } (байт).</summary>
+    public string Cleanup(HashSet<string> library, bool orphans, bool outdated, bool temp, bool all)
+    {
+        long freed = 0;
+        if (all)
+        {
+            freed = AudioStore.TotalBytes();
+            DeleteAll();
+            foreach (var f in TempFiles()) freed += TryDelete(f);
+            return JsonSerializer.Serialize(new { freed });
+        }
+        var touched = new HashSet<string>();
+        foreach (var b in AudioStore.BookIds())
+        {
+            if (!library.Contains(b))
+            {
+                if (orphans && !BusyBook(b)) { freed += AudioStore.BookBytes(b); AudioStore.DeleteBook(b); }
+                continue;
+            }
+            if (!outdated) continue;
+            foreach (var v in AudioStore.VoicesOf(b))
+            {
+                if (Busy(b, v)) continue;
+                var (keys, bytes) = AudioStore.OutdatedFiles(b, v);
+                if (keys.Count == 0) continue;
+                foreach (var k in keys) AudioStore.RemovePhrase(b, v, k);   // эти фразы прозвучат с сервера — уже по-новому
+                AudioStore.SaveFps(b, v);
+                AudioStore.Recount(b, v);
+                freed += bytes;
+                touched.Add(b);
+            }
+        }
+        if (temp) foreach (var f in TempFiles()) freed += TryDelete(f);
+        foreach (var b in touched) Notify(b, force: true);
+        return JsonSerializer.Serialize(new { freed });
+    }
+
+    bool Busy(string bookId, string voice)
+    {
+        lock (sync)
+            return (live != null && live.Job.BookId == bookId && live.Job.Voice == voice) ||
+                   queue.Any(j => j.BookId == bookId && j.Voice == voice) || checking.Contains(bookId + "|" + voice);
+    }
+
+    bool BusyBook(string bookId)
+    {
+        lock (sync) return (live != null && live.Job.BookId == bookId) || queue.Any(j => j.BookId == bookId);
+    }
+
+    /// <summary>Временные файлы: недописанная озвучка (.part) и файлы очереди загрузки, если она пуста.</summary>
+    List<string> TempFiles()
+    {
+        var list = AudioStore.PartFiles();
+        if (!IsActive)
+        {
+            var dir = Path.Combine(FileSystem.CacheDirectory, "dlqueue");
+            try { if (Directory.Exists(dir)) list.AddRange(Directory.GetFiles(dir)); } catch { }
+        }
+        return list;
+    }
+
+    static long TryDelete(string f)
+    {
+        try { var n = new FileInfo(f).Length; File.Delete(f); return n; } catch { return 0; }
+    }
+
     // ---------- обновление скачанной озвучки (шаг 5 спецификации 1.2.0) ----------
 
     readonly HashSet<string> checking = new();            // «книга|голос», которые сейчас сверяются

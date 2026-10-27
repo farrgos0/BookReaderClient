@@ -284,6 +284,18 @@ public sealed class JsBridge(MainPage page)
     public void PreloadDelete(string bookId, string? voice) => AppServices.Preload.Delete(bookId, voice);
     public string PreloadStatus() => AppServices.Preload.StatusJson();
 
+    /// <summary>«Освободить место»: сколько занимает лишнее (в фоне — обход папок).</summary>
+    public void AudioCleanInfoAsync(string reqId) =>
+        Run(reqId, () => Task.Run<string?>(() => AppServices.Preload.CleanupInfo(Lib.Ids())));
+
+    /// <summary>«Освободить место»: удалить отмеченное (optsJson: { orphans, outdated, temp, all }).</summary>
+    public void AudioCleanAsync(string reqId, string optsJson) => Run(reqId, () => Task.Run<string?>(() =>
+    {
+        using var doc = JsonDocument.Parse(string.IsNullOrEmpty(optsJson) ? "{}" : optsJson);
+        bool Opt(string n) => doc.RootElement.TryGetProperty(n, out var v) && v.ValueKind == JsonValueKind.True;
+        return AppServices.Preload.Cleanup(Lib.Ids(), Opt("orphans"), Opt("outdated"), Opt("temp"), Opt("all"));
+    }));
+
     /// <summary>«Обновить» скачанную озвучку открытой книги: заново — устаревшие фразы и скачанные до 1.2.0.
     /// "1" — обновление поставлено в загрузку, "0" — обновлять нечего.</summary>
     public string PreloadRefresh(string bookId, string title, string voice)

@@ -87,6 +87,12 @@ public sealed class LibraryStore
         lock (sync) return Serialize(Db.Table<BookRow>().ToList().Select(ToJs));
     }
 
+    /// <summary>Номера всех книг библиотеки (очистка озвучки книг, которых больше нет).</summary>
+    public HashSet<string> Ids()
+    {
+        lock (sync) return Db.Table<BookRow>().ToList().Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
+    }
+
     public string? GetJson(string id)
     {
         lock (sync) { var r = Db.Find<BookRow>(id); return r == null ? null : Serialize(ToJs(r)); }
