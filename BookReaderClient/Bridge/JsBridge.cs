@@ -335,7 +335,7 @@ public sealed class JsBridge(MainPage page)
             var b = k + 1 < starts.Length ? Math.Clamp(starts[k + 1], a, segs.Count) : segs.Count;
             var done = 0;
             for (var i = a; i < b; i++)
-                if (AudioStore.Existing(bookId, voice, segs[i].Text, segs[i].Pause, keys[i]) != null) done++;
+                if (AudioStore.ExistingAt(bookId, voice, segs, i) != null) done++;
             result.Add([done, b - a]);
         }
         return JsonSerializer.Serialize(result);

@@ -253,29 +253,69 @@ public static class AudioStore
     public static string? Existing(string bookId, string voice, string text, double pause, string? exact = null)
     {
         exact ??= Key(text, pause);
-        if (Has(bookId, voice, exact)) return exact;
+        return Has(bookId, voice, exact) ? exact : Alias(bookId, voice, text, pause);
+    }
+
+    // Внутри абзаца пауза всегда 0,12 — меняется только у последней фразы абзаца и у заголовка. Поэтому вариант
+    // с другой паузой ищем только для таких фраз и только среди «конечных» пауз: так проверка в разы дешевле.
+    const double InnerPause = 0.12;
+    static string? Alias(string bookId, string voice, string text, double pause)
+    {
+        var own = Math.Round(pause, 2);
+        if (Math.Abs(own - InnerPause) < 0.001) return null;
         foreach (var p in KnownPauses)
         {
-            if (Math.Abs(p - Math.Round(pause, 2)) < 0.001) continue;
+            if (Math.Abs(p - own) < 0.001 || Math.Abs(p - InnerPause) < 0.001) continue;
             var k = Key(text, p);
             if (Has(bookId, voice, k)) return k;
         }
         return null;
     }
 
-    /// <summary>Файл скачанной фразы (с учётом другой паузы, см. Existing) или null.</summary>
-    public static string? FindSeg(string bookId, string voice, string text, double pause, string exact)
+    // варианты с другой паузой для фраз открытой книги: считаются один раз на книгу и набор озвучки
+    static readonly object aliasLock = new();
+    static readonly ConditionalWeakTable<IReadOnlyList<PlaybackEngine.Seg>, Dictionary<string, string?[]>> aliasCache = new();
+
+    static string?[] AliasesOf(string bookId, string voice, IReadOnlyList<PlaybackEngine.Seg> segs, CancellationToken ct = default)
     {
-        var k = Existing(bookId, voice, text, pause, exact);
+        var dir = PackDir(bookId, voice);
+        var table = aliasCache.GetValue(segs, _ => new Dictionary<string, string?[]>(StringComparer.Ordinal));
+        lock (aliasLock) if (table.TryGetValue(dir, out var ready)) return ready;
+        var keys = KeysOf(segs);
+        var res = new string?[keys.Length];
+        for (var i = 0; i < keys.Length; i++)
+        {
+            if ((i & 1023) == 0) ct.ThrowIfCancellationRequested();
+            if (!Has(bookId, voice, keys[i])) res[i] = Alias(bookId, voice, segs[i].Text, segs[i].Pause);
+        }
+        lock (aliasLock) table[dir] = res;
+        return res;
+    }
+
+    /// <summary>Ключ скачанной фразы номер i книги (точный или с другой паузой) или null — не скачана.</summary>
+    public static string? ExistingAt(string bookId, string voice, IReadOnlyList<PlaybackEngine.Seg> segs, int i, CancellationToken ct = default)
+    {
+        var exact = KeysOf(segs)[i];
+        if (Has(bookId, voice, exact)) return exact;
+        var a = AliasesOf(bookId, voice, segs, ct)[i];
+        return a != null && Has(bookId, voice, a) ? a : null;   // вариант могли удалить после подсчёта
+    }
+
+    /// <summary>Файл скачанной фразы номер i (с учётом другой паузы) или null.</summary>
+    public static string? FindSeg(string bookId, string voice, IReadOnlyList<PlaybackEngine.Seg> segs, int i)
+    {
+        var k = ExistingAt(bookId, voice, segs, i);
         return k == null ? null : Find(bookId, voice, k);
     }
 
     /// <summary>Фраза скачана заново с точной паузой — убрать её прежние варианты с другой паузой.</summary>
     public static void RemoveAliases(string bookId, string voice, string text, double pause)
     {
+        var own = Math.Round(pause, 2);
+        if (Math.Abs(own - InnerPause) < 0.001) return;
         foreach (var p in KnownPauses)
         {
-            if (Math.Abs(p - Math.Round(pause, 2)) < 0.001) continue;
+            if (Math.Abs(p - own) < 0.001 || Math.Abs(p - InnerPause) < 0.001) continue;
             var k = Key(text, p);
             if (Has(bookId, voice, k)) RemovePhrase(bookId, voice, k);
         }

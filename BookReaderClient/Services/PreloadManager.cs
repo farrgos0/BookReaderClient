@@ -157,7 +157,7 @@ public sealed class PreloadManager
             var k = keys[i];
             if (job.RefreshOnly && !(job.Refresh?.Contains(k) ?? false)) continue;   // «Обновить» недостающее не докачивает
             if (cur.PendingKeys.Contains(k) || cur.InFlight.Contains(k)) continue;
-            if (AudioStore.Existing(cur.Job.BookId, cur.Job.Voice, cur.Segs[i].Text, cur.Segs[i].Pause, k) != null && !(job.Refresh?.Contains(k) ?? false)) continue;
+            if (AudioStore.ExistingAt(cur.Job.BookId, cur.Job.Voice, cur.Segs, i) != null && !(job.Refresh?.Contains(k) ?? false)) continue;
             cur.All.TryAdd(k, (cur.Segs[i].Text, cur.Segs[i].Pause));
             cur.Pending.Add((i, k));
             cur.PendingKeys.Add(k);
@@ -252,7 +252,9 @@ public sealed class PreloadManager
             if (live != null && (onlyBook == null || live.Job.BookId == onlyBook))
             {
                 var key = live.Job.BookId + "|" + live.Job.Voice;
-                var r = Row(live.Job.BookId, live.Job.Voice, live.Total, live.Done, live.Bytes);
+                // задание ещё считает, что уже скачано (большая книга — секунды): показываем прежние цифры, а не 0%
+                var preparing = live.Total == 0 && rows.ContainsKey(key);
+                var r = preparing ? rows[key] : Row(live.Job.BookId, live.Job.Voice, live.Total, live.Done, live.Bytes);
                 r["running"] = true;
                 r["paused"] = net != NetState.Ok;
                 r["jobDone"] = live.JobDone;
@@ -428,9 +430,13 @@ public sealed class PreloadManager
             if (i >= job.From && i < to) ranged.Add((i, keys[i]));
         }
         // скачанное пропускаем — кроме фраз, которые пользователь велел обновить
-        // (фраза с тем же текстом, но другой паузой — тоже скачана: см. AudioStore.Existing)
-        var have = cur.All.Where(p => AudioStore.Existing(job.BookId, job.Voice, p.Value.Text, p.Value.Pause, p.Key) != null
-            && !(job.Refresh?.Contains(p.Key) ?? false)).Select(p => p.Key).ToHashSet();
+        // (фраза с тем же текстом, но другой паузой — тоже скачана: см. AudioStore.ExistingAt); отмена — сразу
+        var have = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < segs.Count; i++)
+        {
+            if ((i & 1023) == 0) ct.ThrowIfCancellationRequested();
+            if (!(job.Refresh?.Contains(keys[i]) ?? false) && AudioStore.ExistingAt(job.BookId, job.Voice, segs, i, ct) != null) have.Add(keys[i]);
+        }
         var seen = new HashSet<string>();
         var todo = ranged.Where(r => !have.Contains(r.Key) && (!job.RefreshOnly || job.Refresh!.Contains(r.Key)) && seen.Add(r.Key)).ToList();
 
@@ -819,7 +825,7 @@ public sealed class PreloadManager
             var seen = new HashSet<string>(StringComparer.Ordinal);
             for (var i = 0; i < keys.Length; i++)
             {
-                var k = AudioStore.Existing(bookId, voice, segs[i].Text, segs[i].Pause, keys[i]);   // файл фразы (пауза могла смениться)
+                var k = AudioStore.ExistingAt(bookId, voice, segs, i, ct);   // файл фразы (пауза могла смениться)
                 if (k != null && fps.ContainsKey(k) && seen.Add(k)) { order.Add(k); texts.Add(segs[i].Text); }
             }
             lock (sync) checkPct[id] = 0;
@@ -858,7 +864,7 @@ public sealed class PreloadManager
         var refresh = new HashSet<string>(StringComparer.Ordinal);
         for (var i = 0; i < segs.Count; i++)
         {
-            var file = AudioStore.Existing(bookId, voice, segs[i].Text, segs[i].Pause, keys[i]);
+            var file = AudioStore.ExistingAt(bookId, voice, segs, i);
             if (file == null) continue;
             inBook.Add(file);
             if (outdated.Contains(file)) refresh.Add(keys[i]);

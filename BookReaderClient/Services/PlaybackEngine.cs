@@ -361,7 +361,7 @@ public sealed class PlaybackEngine
         {
             if (cache.TryGetValue(i, out var t) && !t.IsFaulted && !t.IsCanceled) return t;
             // скачанная заранее озвучка — без сервера
-            var local = AudioStore.FindSeg(bookId, voice, queue[i].Text, queue[i].Pause, AudioStore.KeysOf(queue)[i]);
+            var local = AudioStore.FindSeg(bookId, voice, queue, i);
             t = local != null ? Task.FromResult(local) : DownloadAsync(i, voice, bookId, queue[i], playCts.Token);
             cache[i] = t;
             return t;
