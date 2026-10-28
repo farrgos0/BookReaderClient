@@ -33,6 +33,9 @@ public class MainPage : ContentPage
         engine.Error += msg => Js($"window.__native&&__native.onError({JsonSerializer.Serialize(msg)})");
         engine.Ended += () => Js("window.__native&&__native.onEnded()");
         engine.SleepFired += () => Js("window.__native&&__native.onSleep()");
+        // плеер аудиокниг: ▶/⏸, конец книги, ошибки, таймер сна (в т. ч. от кнопок уведомления и гарнитуры)
+        var ab = AppServices.Audiobook;
+        ab.Changed += () => Js($"window.__native&&__native.onAb({ab.StateJson()})");
 
         // скачивание озвучки: проценты → веб-часть; на Android — фоновая служба с уведомлением
         var preload = AppServices.Preload;

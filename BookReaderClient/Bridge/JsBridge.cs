@@ -91,11 +91,13 @@ public sealed class JsBridge(MainPage page)
     public string LibFinishAdd(string token, string metaJson) => Lib.FinishAdd(token, metaJson);
     public void LibRemove(string id)
     {
+        if (AppServices.Audiobook.BookId == id) AppServices.Audiobook.Stop();   // слушали эту аудиокнигу
         Lib.Remove(id);
         AppServices.Preload.Delete(id, null); // скачанная озвучка уходит вместе с книгой
     }
     public void LibClear()
     {
+        AppServices.Audiobook.Stop();
         Lib.Clear();
         AppServices.Preload.DeleteAll();
     }
@@ -134,6 +136,22 @@ public sealed class JsBridge(MainPage page)
 
     public void LibPickFilesAsync(string reqId) => Run(reqId, async () =>
         await MainThread.InvokeOnMainThreadAsync(() => Lib.PickFilesJson()));
+
+    /// <summary>Аудиокнига из нескольких файлов (или архив со сжатием) → один ZIP без сжатия: { id, name, isNew }.</summary>
+    public void LibAudioPackAsync(string reqId, string idsJson, string name) => Run(reqId, () =>
+        Task.FromResult<string?>(Lib.PackAudioJson(idsJson, string.IsNullOrWhiteSpace(name) ? "Аудиокнига.zip" : name)));
+
+    // ---------- плеер аудиокниг (шаг 8) ----------
+    static AudiobookPlayer Ab => AppServices.Audiobook;
+    static double D(string? s) => double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0;
+    public void AbOpen(string json) => Ab.Open(json);
+    public void AbPlay(string at, string rate) => Ab.Play(D(at), D(rate) is > 0 and var r ? r : 1);
+    public void AbPause() => Ab.Pause();
+    public void AbSeek(string at) => Ab.Seek(D(at));
+    public void AbRate(string rate) => Ab.SetRate(D(rate) is > 0 and var r ? r : 1);
+    public void AbSleep(string minutes, string chapterEnd) => Ab.SetSleep(Int(minutes ?? "0"), chapterEnd == "1");
+    public void AbStop() => Ab.Stop();
+    public string AbState() => Ab.StateJson();
 
     // ---------- плеер ----------
     // Фразы недавно открытых книг: при возврате к книге JS присылает только подпись (sig), а не всю книгу заново —

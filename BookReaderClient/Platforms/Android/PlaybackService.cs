@@ -12,6 +12,7 @@ namespace BookReaderClient;
 /// <summary>
 /// Фоновый сервис чтения: держит процесс живым при погашенном экране, показывает уведомление
 /// с кнопками ⏮ ⏯ ⏭ ✕ и принимает кнопки гарнитуры/экрана блокировки (MediaSession).
+/// Управляет тем, что запущено последним: озвучкой книги или аудиокнигой (AppServices.Active).
 /// </summary>
 [Service(Exported = false, ForegroundServiceType = ForegroundService.TypeMediaPlayback)]
 public class PlaybackService : Service
@@ -27,7 +28,8 @@ public class PlaybackService : Service
     static PlaybackService? instance;
     MediaSession? session;
 
-    static PlaybackEngine Engine => AppServices.Engine;
+    static IMediaSource Media => AppServices.Active;
+    static bool IsAudiobook => Media is AudiobookPlayer;
 
     /// <summary>Запустить сервис (или обновить уведомление, если уже работает).</summary>
     public static void EnsureRunning()
@@ -51,9 +53,9 @@ public class PlaybackService : Service
         session.SetCallback(new SessionCallback());
         session.Active = true;
 
-        Engine.StateChanged += OnEngineState;
-        Engine.SegmentChanged += OnEngineSegment;
-        Engine.Ended += OnEngineEnded;
+        AppServices.TtsSource.Changed += Refresh;
+        AppServices.Audiobook.Changed += Refresh;
+        AppServices.ActiveChanged += Refresh;
     }
 
     public override StartCommandResult OnStartCommand(Intent? intent, StartCommandFlags flags, int startId)
@@ -62,32 +64,33 @@ public class PlaybackService : Service
         StartForegroundCompat(BuildNotification());
         switch (intent?.Action)
         {
-            case ActionToggle: Engine.TogglePlayPause(); break;
-            case ActionNext: Engine.Next(); break;
-            case ActionPrev: Engine.Prev(); break;
-            case ActionStop: Engine.Stop(); Shutdown(); break;
+            case ActionToggle: Media.Toggle(); break;
+            case ActionNext: Media.Next(); break;
+            case ActionPrev: Media.Prev(); break;
+            case ActionStop: Media.Stop(); Shutdown(); break;
         }
         return StartCommandResult.NotSticky;
     }
 
     public override void OnDestroy()
     {
-        Engine.StateChanged -= OnEngineState;
-        Engine.SegmentChanged -= OnEngineSegment;
-        Engine.Ended -= OnEngineEnded;
+        AppServices.TtsSource.Changed -= Refresh;
+        AppServices.Audiobook.Changed -= Refresh;
+        AppServices.ActiveChanged -= Refresh;
         session?.Release();
         session = null;
         instance = null;
         base.OnDestroy();
     }
 
-    void OnEngineState(bool playing, bool loading) => Refresh();
-    void OnEngineSegment(int index) => Refresh();
-    void OnEngineEnded() => Refresh();
-
     void Refresh()
     {
-        var playing = Engine.IsPlaying || Engine.IsLoading;
+        if (Looper.MyLooper() != Looper.MainLooper)
+        {
+            MainThread.BeginInvokeOnMainThread(Refresh);
+            return;
+        }
+        var playing = Media.IsPlaying || Media.IsLoading;
         UpdateSession(playing);
         var nm = (NotificationManager?)GetSystemService(NotificationService);
         nm?.Notify(NotificationId, BuildNotification());
@@ -121,20 +124,22 @@ public class PlaybackService : Service
         if (session == null) return;
         var state = new PlaybackState.Builder()
             .SetActions(PlaybackState.ActionPlay | PlaybackState.ActionPause | PlaybackState.ActionPlayPause |
-                        PlaybackState.ActionSkipToNext | PlaybackState.ActionSkipToPrevious | PlaybackState.ActionStop)!
+                        PlaybackState.ActionSkipToNext | PlaybackState.ActionSkipToPrevious | PlaybackState.ActionStop |
+                        PlaybackState.ActionFastForward | PlaybackState.ActionRewind)!
             .SetState(playing ? PlaybackStateCode.Playing : PlaybackStateCode.Paused, PlaybackState.PlaybackPositionUnknown, 1f)!
             .Build();
         session.SetPlaybackState(state);
         var meta = new MediaMetadata.Builder()
-            .PutString(MediaMetadata.MetadataKeyTitle, string.IsNullOrEmpty(Engine.BookTitle) ? "BookReader" : Engine.BookTitle)!
-            .PutString(MediaMetadata.MetadataKeyArtist, Short(Engine.CurrentText, 120))!
+            .PutString(MediaMetadata.MetadataKeyTitle, string.IsNullOrEmpty(Media.Title) ? "BookReader" : Media.Title)!
+            .PutString(MediaMetadata.MetadataKeyArtist, Short(Media.Subtitle, 120))!
             .Build();
         session.SetMetadata(meta);
     }
 
     Notification BuildNotification()
     {
-        var playing = Engine.IsPlaying || Engine.IsLoading;
+        var playing = Media.IsPlaying || Media.IsLoading;
+        var audiobook = IsAudiobook;
         var builder = OperatingSystem.IsAndroidVersionAtLeast(26)
             ? new Notification.Builder(this, ChannelId)
             : new Notification.Builder(this);
@@ -145,16 +150,19 @@ public class PlaybackService : Service
 
         builder
             .SetSmallIcon(global::Android.Resource.Drawable.IcMediaPlay)!
-            .SetContentTitle(string.IsNullOrEmpty(Engine.BookTitle) ? "BookReader" : Engine.BookTitle)!
-            .SetContentText(Short(Engine.CurrentText, 160))!
+            .SetContentTitle(string.IsNullOrEmpty(Media.Title) ? "BookReader" : Media.Title)!
+            .SetContentText(Short(Media.Subtitle, 160))!
             .SetContentIntent(open)!
             .SetOngoing(playing)!
             .SetShowWhen(false)!
             .SetVisibility(NotificationVisibility.Public)!
-            .AddAction(ActionButton(global::Android.Resource.Drawable.IcMediaPrevious, "Назад", ActionPrev, 1))!
+            // аудиокнига: −15 / +30 секунд; озвучка: предыдущая / следующая фраза
+            .AddAction(ActionButton(audiobook ? global::Android.Resource.Drawable.IcMediaRew : global::Android.Resource.Drawable.IcMediaPrevious,
+                audiobook ? "−15 с" : "Назад", ActionPrev, 1))!
             .AddAction(ActionButton(playing ? global::Android.Resource.Drawable.IcMediaPause : global::Android.Resource.Drawable.IcMediaPlay,
-                playing ? "Пауза" : "Читать", ActionToggle, 2))!
-            .AddAction(ActionButton(global::Android.Resource.Drawable.IcMediaNext, "Вперёд", ActionNext, 3))!
+                playing ? "Пауза" : audiobook ? "Слушать" : "Читать", ActionToggle, 2))!
+            .AddAction(ActionButton(audiobook ? global::Android.Resource.Drawable.IcMediaFf : global::Android.Resource.Drawable.IcMediaNext,
+                audiobook ? "+30 с" : "Вперёд", ActionNext, 3))!
             .AddAction(ActionButton(global::Android.Resource.Drawable.IcMenuCloseClearCancel, "Стоп", ActionStop, 4));
 
         if (session != null)
@@ -180,10 +188,12 @@ public class PlaybackService : Service
     /// <summary>Кнопки гарнитуры, экрана блокировки, Bluetooth.</summary>
     sealed class SessionCallback : MediaSession.Callback
     {
-        public override void OnPlay() => Engine.Resume(Engine.Index);
-        public override void OnPause() => Engine.Pause();
-        public override void OnSkipToNext() => Engine.Next();
-        public override void OnSkipToPrevious() => Engine.Prev();
-        public override void OnStop() => Engine.Stop();
+        public override void OnPlay() => Media.Play();
+        public override void OnPause() => Media.Pause();
+        public override void OnSkipToNext() => Media.Next();
+        public override void OnSkipToPrevious() => Media.Prev();
+        public override void OnFastForward() => Media.Next();
+        public override void OnRewind() => Media.Prev();
+        public override void OnStop() => Media.Stop();
     }
 }
