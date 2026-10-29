@@ -17,8 +17,8 @@
 
     <ApplicationTitle>BookReader</ApplicationTitle>
     <ApplicationId Condition="'$(ApplicationId)' == ''">io.github.bookreader.client</ApplicationId>
-    <ApplicationDisplayVersion>1.1.1</ApplicationDisplayVersion>
-    <ApplicationVersion>10101</ApplicationVersion>
+    <ApplicationDisplayVersion>1.2.0</ApplicationDisplayVersion>
+    <ApplicationVersion>10200</ApplicationVersion>
     <!-- одна версия для всех платформ: иначе MAUI берёт её из ApplicationDisplayVersion только для Windows,
          Android остаётся 1.0.0 — и восстановление пакетов в Visual Studio падает (NU1105 → NETSDK1047) -->
     <Version>$(ApplicationDisplayVersion)</Version>
