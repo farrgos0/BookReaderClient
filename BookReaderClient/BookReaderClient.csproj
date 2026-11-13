@@ -41,12 +41,9 @@
     <!-- мост JS ↔ C# и SQLite работают через System.Text.Json с отражением -->
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
 
-    <!-- Веб-интерфейс читалки берётся прямо из папки сервера — одна копия на всё.
-         По умолчанию — соседняя папка с сервером (BookReader или FB2Reader рядом с BookReaderClient).
+    <!-- Веб-интерфейс читалки — папка web в этом репозитории (общий интерфейс для приложения и серверов).
          Другой путь: local.props или dotnet build -p:WebUiDir=путь\к\web -->
-    <WebUiDir Condition="'$(WebUiDir)' == '' and Exists('$(MSBuildThisFileDirectory)..\..\BookReader\web\index.html')">$(MSBuildThisFileDirectory)..\..\BookReader\web</WebUiDir>
-    <WebUiDir Condition="'$(WebUiDir)' == '' and Exists('$(MSBuildThisFileDirectory)..\..\FB2Reader\web\index.html')">$(MSBuildThisFileDirectory)..\..\FB2Reader\web</WebUiDir>
-    <WebUiDir Condition="'$(WebUiDir)' == ''">$(MSBuildThisFileDirectory)..\..\BookReader\web</WebUiDir>
+    <WebUiDir Condition="'$(WebUiDir)' == ''">$(MSBuildThisFileDirectory)..\web</WebUiDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -69,7 +66,7 @@
   </ItemGroup>
 
   <Target Name="CheckWebUi" BeforeTargets="PrepareForBuild" Condition="!Exists('$(WebUiDir)\index.html')">
-    <Error Text="Не найден веб-интерфейс читалки: $(WebUiDir)\index.html. Положите папку сервера BookReader рядом с BookReaderClient или укажите путь к её папке web в local.props (см. local.props.example) либо: dotnet build -p:WebUiDir=путь" />
+    <Error Text="Не найден веб-интерфейс читалки: $(WebUiDir)\index.html. Папка web должна лежать в корне репозитория BookReaderClient; другой путь — в local.props (см. local.props.example) или: dotnet build -p:WebUiDir=путь" />
   </Target>
 
 </Project>

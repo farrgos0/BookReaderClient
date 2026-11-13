@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ru" data-theme="paper">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BookReader</title>
+  <link rel="icon" href="favicon.ico">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4.5" height="14" rx="1.2"/><rect x="13.5" y="5" width="4.5" height="14" rx="1.2"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 5h2v14H6zM19 6.2v11.6a.8.8 0 0 1-1.2.7L9.6 12.7a.8.8 0 0 1 0-1.4l8.2-5.8a.8.8 0 0 1 1.2.7z"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM5 6.2v11.6a.8.8 0 0 0 1.2.7l8.2-5.8a.8.8 0 0 0 0-1.4L6.2 5.5A.8.8 0 0 0 5 6.2z"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-open" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z"/></symbol>
+    <symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-books" viewBox="0 0 24 24"><path d="M4 4.5h3.2v15H4zM8.6 4.5h3.2v15H8.6zM13.3 5.6l3-.8 3.9 14.4-3 .8z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pages" viewBox="0 0 24 24"><path d="M3 5.5c3-.9 6-.6 9 1.2v12.8c-3-1.8-6-2.1-9-1.2zM21 5.5c-3-.9-6-.6-9 1.2v12.8c3-1.8 6-2.1 9-1.2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-scroll" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 7.5h7M8.5 11h7M8.5 14.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 8.6a3.4 3.4 0 1 0 0 6.8 3.4 3.4 0 0 0 0-6.8z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 13.5l1.6 1.2-1.8 3.1-1.9-.7a7.6 7.6 0 0 1-1.9 1.1l-.3 2h-3.6l-.3-2a7.6 7.6 0 0 1-1.9-1.1l-1.9.7-1.8-3.1 1.6-1.2a7.4 7.4 0 0 1 0-3l-1.6-1.2 1.8-3.1 1.9.7a7.6 7.6 0 0 1 1.9-1.1l.3-2h3.6l.3 2a7.6 7.6 0 0 1 1.9 1.1l1.9-.7 1.8 3.1-1.6 1.2a7.4 7.4 0 0 1 0 3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-toc" viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4.8" cy="6.5" r="1.4"/><circle cx="4.8" cy="12" r="1.4"/><circle cx="4.8" cy="17.5" r="1.4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18.5h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.1 4.7 4.7 0 0 0 7 18.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10.5v5.5M9.5 13.8 12 16.3l2.5-2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.6l2.5 5.2 5.7.8-4.1 4 1 5.7L12 16.6l-5.1 2.7 1-5.7-4.1-4 5.7-.8z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-move" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 13.5h6.5M13 11l2.5 2.5L13 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-select" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 12.2l2.7 2.7L16.2 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-all" viewBox="0 0 24 24"><rect x="7.5" y="7.5" width="13" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 15V6a2 2 0 0 1 2-2h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10.5 14l2.2 2.2 4.3-4.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="17.5" cy="5.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="6.5" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="17.5" cy="18.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.7 10.8l6.6-4M8.7 13.2l6.6 4" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l1 12.5h9l1-12.5M10 10.5v6M14 10.5v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-voice" viewBox="0 0 24 24"><path d="M4.5 14v-2a7.5 7.5 0 0 1 15 0v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="3.5" y="13.5" width="4" height="6.5" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="16.5" y="13.5" width="4" height="6.5" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-back15" viewBox="0 0 24 24"><path d="M4.6 9.5A8 8 0 1 1 4 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M3.6 4.8v5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text x="12.6" y="15.6" text-anchor="middle" font-size="8" font-weight="700" font-family="system-ui,sans-serif" fill="currentColor">15</text></symbol>
+    <symbol id="i-fwd30" viewBox="0 0 24 24"><path d="M19.4 9.5A8 8 0 1 0 20 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M20.4 4.8v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text x="11.4" y="15.6" text-anchor="middle" font-size="8" font-weight="700" font-family="system-ui,sans-serif" fill="currentColor">30</text></symbol>
+    <symbol id="i-chapters" viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3.5 4.5l3 2-3 2z"/><circle cx="4.8" cy="12" r="1.3"/><circle cx="4.8" cy="17.5" r="1.3"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H15v-6H9v6H5.5A1.5 1.5 0 0 1 4 19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-vol" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  </svg>
+
+  <header class="topbar">
+    <button class="icon-btn" id="btnLib" title="Книги и настройки (L)" aria-label="Книги и настройки"><svg><use href="#i-books"/></svg></button>
+    <div class="book-head">
+      <div class="book-title" id="bookTitle">BookReader</div>
+      <div class="book-author" id="bookAuthor">Читалка с озвучкой Silero</div>
+    </div>
+    <button class="icon-btn" id="btnToc" title="Оглавление (T)" aria-label="Оглавление" disabled><svg><use href="#i-toc"/></svg></button>
+  </header>
+
+  <div class="server-warn" id="serverWarn" hidden>
+    <span class="warn-text" id="warnText">Сервер озвучки не отвечает. Запустите <b>BookReader</b> на ПК (ярлык на рабочем столе или BookReader.bat в папке программы) и обновите страницу.</span>
+    <span class="warn-actions">
+      <button class="warn-btn native-only" id="warnOffline">Работать без сервера</button>
+      <button class="warn-x" id="warnClose" title="Скрыть" aria-label="Скрыть">✕</button>
+    </span>
+  </div>
+
+  <aside class="panel lib" id="lib" aria-hidden="true">
+    <div class="panel-head">
+      <button class="icon-btn back" id="setBack" title="К списку книг" hidden>‹</button>
+      <span id="libHeadTitle">Библиотека <span class="count" id="libCount"></span></span>
+      <select id="libKind" class="lib-kind" aria-label="Показывать" hidden>
+        <option value="all">Библиотека</option>
+        <option value="text">Книги</option>
+        <option value="audio">Аудиокниги</option>
+      </select>
+      <button class="icon-btn" id="btnHome" title="Главная — стартовый экран" aria-label="Главная" hidden><svg><use href="#i-home"/></svg></button>
+      <button class="icon-btn" id="btnSelect" title="Выбрать несколько" aria-label="Выбрать несколько"><svg><use href="#i-select"/></svg></button>
+      <button class="icon-btn" id="libClose" title="Закрыть">✕</button>
+    </div>
+    <div class="lib-view" id="libView">
+    <div class="lib-tools">
+      <label class="btn-add" title="Добавить книги">
+        <svg><use href="#i-plus"/></svg><span>Добавить</span>
+        <input type="file" id="libFiles" accept=".fb2,.zip,.epub,.txt,.md,.html,.htm,.xhtml,.docx,.odt,.rtf,.mobi,.azw,.azw3,.prc,.pdf,.mp3,.m4b,.m4a,.mp4,.ogg,.oga,.opus,.flac,.wav" multiple hidden>
+      </label>
+      <button class="btn-cat tts-only" id="btnCatalog" title="Книги из папки catalog на сервере"><svg><use href="#i-cloud"/></svg><span>Каталог</span></button>
+      <input type="search" id="libSearch" placeholder="Поиск" aria-label="Поиск">
+      <select id="libSort" aria-label="Сортировка">
+        <option value="recent">Недавние</option>
+        <option value="added">Добавленные</option>
+        <option value="title">По названию</option>
+        <option value="author">По автору</option>
+        <option value="progress">По прогрессу</option>
+      </select>
+    </div>
+    <div class="dl-queue" id="dlQueueBar" hidden></div>
+    <div class="lib-list" id="libList"></div>
+    <div class="sel-bar" id="selBar" hidden>
+      <button class="sel-btn" id="selCancel" title="Отменить выбор" aria-label="Отменить выбор"><svg><use href="#i-x"/></svg><span>Отмена</span></button>
+      <span class="sel-count" id="selCount" aria-hidden="true"></span>
+      <button class="sel-btn" id="selAll" title="Выбрать все" aria-label="Выбрать все"><svg><use href="#i-all"/></svg><span>Все</span></button>
+      <button class="sel-btn" id="selShare" title="Поделиться выбранными" aria-label="Поделиться выбранными"><svg><use href="#i-share"/></svg><span>Файлы</span></button>
+      <button class="sel-btn native-only tts-only" id="selAudio" title="Озвучка выбранных: загрузить или удалить" aria-label="Озвучка выбранных"><svg><use href="#i-voice"/></svg><span>Озвучка</span></button>
+      <button class="sel-btn danger" id="selDelete" title="Удалить выбранные книги" aria-label="Удалить выбранные книги"><svg><use href="#i-trash"/></svg><span>Удалить</span></button>
+    </div>
+    <div class="lib-foot">
+      <button class="btn-settings" id="btnOpenSettings"><svg><use href="#i-gear"/></svg><span>Настройки</span></button>
+      <div class="lib-foot-info">
+        <span id="libUsage"></span>
+      </div>
+    </div>
+    </div>
+    <div class="set-view" id="setPanel" hidden>
+      <label class="set-field"><span>Режим чтения</span>
+        <select id="setView"><option value="scroll">Лента — сплошной текст</option><option value="paged">Страницы — как в книге</option></select>
+      </label>
+      <label class="set-field"><span>Тема</span>
+        <select id="setTheme"><option value="paper">Бумага</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select>
+      </label>
+      <label class="set-field"><span>Размер шрифта</span>
+        <select id="setFont">
+          <option value="14">14 — очень мелкий</option><option value="16">16 — мелкий</option><option value="18">18</option>
+          <option value="20">20 — обычный</option><option value="22">22</option><option value="24">24 — крупный</option>
+          <option value="26">26</option><option value="28">28 — очень крупный</option><option value="32">32 — максимальный</option>
+        </select>
+      </label>
+      <label class="set-field native-only"><span>Режим</span>
+        <select id="setServer">
+          <option value="online">С сервером озвучки</option>
+          <option value="offline">Без сервера — только скачанная озвучка</option>
+          <option value="autonomous">Автономный режим</option>
+        </select>
+      </label>
+      <label class="set-field tts-only"><span>Голос озвучки</span>
+        <select id="voice"><option>…</option></select>
+      </label>
+      <label class="set-field tts-only"><span>Даты вида 01.02.2001</span>
+        <select id="setDateOrder"><option value="dmy">ДД.ММ.ГГГГ — первое февраля</option><option value="mdy">ММ.ДД.ГГГГ — второе января</option></select>
+      </label>
+      <button class="set-btn native-only tts-only" id="btnServer"><svg><use href="#i-gear"/></svg><span>Подключение к серверу…</span></button>
+      <button class="set-btn tts-only" id="btnPron"><span>Произношение…</span></button>
+      <button class="set-btn" id="btnSpace"><span>Освободить место…</span></button>
+      <button class="set-btn" id="btnLicense"><span>Лицензия и сторонние компоненты</span></button>
+      <button class="set-btn" id="btnUpdCheck"><span>Проверить обновления</span></button>
+      <p class="set-hint upd-line" id="updLine"></p>
+      <p class="set-hint web-only">Клик по фразе — выбрать, двойной клик или ▶ — читать с неё.<br>Клавиши: пробел — читать / пауза, ← → — листать, T — оглавление, L — книги.</p>
+      <p class="set-hint native-only tts-only">Касание фразы — выбрать, двойное касание или ▶ — читать с неё.<br>Свайп от левого края — книги, от правого — оглавление.</p>
+      <p class="set-hint auto-only">Автономный режим: только чтение — без сервера и нейроозвучки.<br>Свайп от левого края — книги, от правого — оглавление.</p>
+    </div>
+    <div class="cat-view" id="catPanel" hidden>
+      <div class="cat-tools">
+        <input type="search" id="catSearch" placeholder="Поиск в каталоге" aria-label="Поиск в каталоге">
+        <button class="icon-btn" id="catRefresh" title="Обновить список" aria-label="Обновить список"><svg><use href="#i-refresh"/></svg></button>
+      </div>
+      <div class="cat-list" id="catList"></div>
+      <div class="cat-foot" id="catInfo"></div>
+    </div>
+  </aside>
+
+  <aside class="panel toc" id="toc" aria-hidden="true">
+    <div class="panel-head">
+      <span>Оглавление</span>
+      <button class="icon-btn" id="tocClose" title="Закрыть">✕</button>
+    </div>
+    <div class="toc-tools native-only tts-only"><button class="set-btn" id="btnDl"><svg><use href="#i-dl"/></svg><span>Озвучка без интернета…</span></button></div>
+    <div class="toc-auto" id="tocAuto" hidden></div>
+    <nav id="tocList"></nav>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <main id="main">
+    <section class="empty" id="empty">
+      <div class="drop" id="drop">
+        <input type="file" id="fileInput" accept=".fb2,.zip,.epub,.txt,.md,.html,.htm,.xhtml,.docx,.odt,.rtf,.mobi,.azw,.azw3,.prc,.pdf,.mp3,.m4b,.m4a,.mp4,.ogg,.oga,.opus,.flac,.wav" multiple hidden>
+        <div class="drop-mark"><svg><use href="#i-books"/></svg></div>
+        <h1>Добавить в библиотеку</h1>
+        <p>Отпустите файлы — книги и аудиокниги добавятся в библиотеку.</p>
+        <p class="formats">FB2 · EPUB · MOBI/AZW3 · PDF · DOCX · ODT · RTF · TXT · HTML · MD<br>Аудиокниги: MP3 · M4B · OGG · OPUS · FLAC · WAV</p>
+        <p class="hint">Книги сохраняются в библиотеке браузера. Озвучка — локально, голосами Silero.</p>
+      </div>
+      <!-- стартовый экран: последняя книга, избранные, недавние -->
+      <div class="home-last" id="homeLast" hidden></div>
+      <div class="recent" id="homeFav" hidden>
+        <h2>Избранные</h2>
+        <div class="recent-list" id="favList"></div>
+      </div>
+      <div class="recent" id="recent" hidden>
+        <h2>Недавние</h2>
+        <div class="recent-list" id="recentList"></div>
+      </div>
+      <div class="home-empty" id="homeEmpty" hidden>
+        <div class="drop-mark"><svg><use href="#i-books"/></svg></div>
+        <h1>Библиотека пуста</h1>
+        <p>Добавьте книги или аудиокниги: <b>Библиотека → «Добавить»</b><span class="web-only"> или перетащите файлы в окно</span>.</p>
+        <p class="formats">FB2 · EPUB · MOBI/AZW3 · PDF · DOCX · ODT · RTF · TXT · HTML · MD<br>Аудиокниги: MP3 · M4B · OGG · OPUS · FLAC · WAV</p>
+        <button class="set-btn primary" id="homeOpenLib"><svg><use href="#i-books"/></svg><span>Открыть библиотеку</span></button>
+      </div>
+    </section>
+    <!-- аудиокнига (шаг 8): обложка вместо текста; управление — плеер внизу, главы — в оглавлении -->
+    <section class="ab-stage" id="abStage" hidden>
+      <div class="ab-cover" id="abCover"></div>
+      <div class="ab-title" id="abTitle"></div>
+      <div class="ab-author" id="abAuthor"></div>
+      <button class="ab-chapter" id="abChapter" title="Главы"></button>
+    </section>
+    <div class="pager" id="pager">
+      <article class="reader" id="reader" hidden></article>
+    </div>
+    <button class="page-nav prev" id="pagePrev" title="Предыдущая страница (←)"><svg><use href="#i-chev-l"/></svg><span>Назад</span></button>
+    <button class="page-nav next" id="pageNext" title="Следующая страница (→)"><svg><use href="#i-chev-r"/></svg><span>Вперёд</span></button>
+    <div class="page-bar">
+      <button class="page-btn" id="pageBack" title="Предыдущая страница (←)"><svg><use href="#i-chev-l"/></svg><span>Назад</span></button>
+      <span class="page-num" id="pageNum"></span>
+      <button class="page-btn" id="pageFwd" title="Следующая страница (→)"><span>Вперёд</span><svg><use href="#i-chev-r"/></svg></button>
+    </div>
+  </main>
+
+  <!-- место чтения ушло с экрана — вернуться; переход во время чтения — отменить -->
+  <button class="to-reading tts-only" id="toReading" hidden title="Вернуться к месту, где идёт чтение"><svg><use href="#i-locate"/></svg><span>К месту чтения</span></button>
+  <div class="undo-bar tts-only" id="undoBar" hidden role="status"><span id="undoText"></span><button id="undoBtn">↩ Вернуться</button></div>
+
+  <footer class="player tts-only" id="player">
+    <div class="progress-row">
+      <input type="range" id="seek" min="0" max="0" value="0" step="1" disabled aria-label="Позиция в книге">
+      <div class="seek-mark" id="seekMark" hidden title="Место чтения"></div>
+      <div class="seek-tip" id="seekTip" hidden></div>
+    </div>
+    <div class="controls-row">
+      <div class="transport">
+        <button class="icon-btn" id="btnPrev" title="Назад (←)" disabled><svg><use href="#i-prev"/></svg></button>
+        <button class="play-btn" id="btnPlay" title="Воспроизвести / пауза (пробел)" disabled>
+          <svg class="ic-play"><use href="#i-play"/></svg>
+          <svg class="ic-pause"><use href="#i-pause"/></svg>
+          <span class="spinner"></span>
+        </button>
+        <button class="icon-btn" id="btnNext" title="Вперёд (→)" disabled><svg><use href="#i-next"/></svg></button>
+      </div>
+      <div class="status">
+        <div class="status-main" id="statusMain">Нет книги</div>
+        <div class="status-sub" id="statusSub">&nbsp;</div>
+      </div>
+      <div class="settings">
+        <button class="icon-btn sleep-btn" id="btnSleep" title="Таймер сна" aria-label="Таймер сна"><svg><use href="#i-moon"/></svg><span class="sleep-left" id="sleepLeft" hidden></span></button>
+        <label class="field rate" title="Скорость чтения">
+          <select id="rate" aria-label="Скорость">
+            <option value="0.75">0,75×</option>
+            <option value="0.9">0,9×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.1">1,1×</option>
+            <option value="1.25">1,25×</option>
+            <option value="1.5">1,5×</option>
+            <option value="1.75">1,75×</option>
+            <option value="2">2×</option>
+          </select>
+        </label>
+        <label class="field vol" title="Громкость">
+          <svg><use href="#i-vol"/></svg>
+          <input type="range" id="volume" min="0" max="1" step="0.05" value="1">
+        </label>
+      </div>
+    </div>
+  </footer>
+
+  <div class="modal" id="dl" hidden role="dialog" aria-modal="true" aria-labelledby="dlHead">
+    <div class="modal-card">
+      <div class="panel-head"><span id="dlHead">Озвучка без интернета</span><button class="icon-btn" id="dlClose" title="Закрыть">✕</button></div>
+      <div class="modal-body">
+        <div class="dl-book" id="dlBook"></div>
+        <label class="set-field"><span>Голос</span><select id="dlVoice"></select></label>
+        <div class="set-field"><span>Что скачать</span>
+          <div class="dl-mode">
+            <label><input type="radio" name="dlMode" value="all" checked> Всю книгу</label>
+            <label id="dlModeCh"><input type="radio" name="dlMode" value="ch"> Главы</label>
+          </div>
+          <div class="dl-range" id="dlRange" hidden>
+            <label>с главы<select id="dlFrom"></select></label>
+            <label>по главу<select id="dlTo"></select></label>
+          </div>
+        </div>
+        <div class="dl-est" id="dlEst"></div>
+        <div class="dl-status">
+          <div class="dl-bar"><i id="dlBar"></i></div>
+          <div class="dl-text" id="dlText"></div>
+        </div>
+        <div class="dl-upd" id="dlUpd" hidden><div class="dl-upd-text"></div>
+          <button class="set-btn" id="dlRefresh"><span>Обновить</span></button></div>
+        <div class="dl-packs" id="dlPacks" hidden></div>
+        <div class="dl-chapters" id="dlChapters" hidden></div>
+        <div class="dl-actions">
+          <button class="set-btn primary" id="dlStart"><svg><use href="#i-dl"/></svg><span>Скачать</span></button>
+          <button class="set-btn primary" id="dlListen" hidden><svg><use href="#i-play"/></svg><span>Слушать</span></button>
+          <button class="set-btn" id="dlStop" hidden>Остановить</button>
+          <button class="link-danger" id="dlDelete" hidden>Удалить скачанное этим голосом</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal" id="ask" hidden role="dialog" aria-modal="true" aria-labelledby="askHead">
+    <div class="modal-card">
+      <div class="panel-head"><span id="askHead"></span><button class="icon-btn" id="askClose" title="Закрыть">✕</button></div>
+      <div class="modal-body ask-body" id="askBody"></div>
+      <div class="ask-actions" id="askActions"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    // внутри приложения BookReaderClient подключаем мост HybridWebView (если .NET не подставил его сам)
+    if (!window.HybridWebView && location.hostname === "0.0.0.1") document.write('<script src="_framework/hybridwebview.js"><\/script>');
+  </script>
+  <script src="zip.js"></script>
+  <script src="fb2.js"></script>
+  <script src="formats.js"></script>
+  <script src="audiometa.js"></script>
+  <script src="library.js"></script>
+  <script src="legal.js"></script>
+  <script src="native.js"></script>
+  <script src="longpress.js"></script>
+  <script src="picker.js"></script>
+  <script src="pron-model.js"></script>
+  <script src="pron.js"></script>
+  <script src="audiobook.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

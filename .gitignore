@@ -23,3 +23,6 @@ dist/
 # личные скрипты синхронизации с GitHub
 git-sync.bat
 git-commit.bat
+
+# дубли pdf.js (читалка грузит *.min.js)
+web/vendor/pdfjs/*.mjs

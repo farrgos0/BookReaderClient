@@ -1,0 +1,976 @@
+:root {
+  --font-read: "Literata", "PT Serif", Georgia, "Times New Roman", serif;
+  --font-ui: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --read-size: 20px;
+  --radius: 10px;
+  --player-h: 112px;
+  --top-h: 59px;
+}
+
+[data-theme="paper"] {
+  --bg: #f4efe4; --surface: #fbf8f1; --ink: #2b2620; --muted: #7d7365; --line: #e2d9c7;
+  --accent: #b4532a; --accent-ink: #fff; --hl: #f3d9a8; --hl-ink: #2b2620; --hl-soft: #f1e4c8;
+}
+[data-theme="light"] {
+  --bg: #f6f6f4; --surface: #ffffff; --ink: #1d1d1b; --muted: #6f6f6a; --line: #e4e4e0;
+  --accent: #2f5bd3; --accent-ink: #fff; --hl: #dbe5ff; --hl-ink: #10204d; --hl-soft: #edf1fc;
+}
+[data-theme="dark"] {
+  --bg: #17171a; --surface: #1f1f23; --ink: #dcd8cf; --muted: #8e8a82; --line: #2f2f35;
+  --accent: #e08a5a; --accent-ink: #1a1208; --hl: #4a3a24; --hl-ink: #f5e6cc; --hl-soft: #2b261f;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+.native-only { display: none !important; }
+html.native .native-only { display: inline-grid !important; }
+html, body { margin: 0; min-height: 100%; }
+body { padding-top: var(--top-h); }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-ui);
+  transition: background .25s, color .25s;
+}
+button, select, input { font: inherit; color: inherit; }
+svg { width: 22px; height: 22px; fill: currentColor; }
+
+/* ---------- верхняя панель ---------- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: var(--top-h); z-index: 20;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+}
+.book-head { min-width: 0; flex: 1; text-align: center; }
+.book-title { font-weight: 650; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.book-author { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-actions { display: flex; align-items: center; gap: 6px; }
+.font-ctl { display: flex; }
+
+.icon-btn {
+  display: inline-grid; place-items: center; min-width: 38px; height: 38px; padding: 0 8px;
+  border: 0; border-radius: 9px; background: transparent; cursor: pointer; color: var(--ink);
+}
+.icon-btn.txt { font-weight: 600; font-size: 14px; }
+@media (hover: hover) { .icon-btn:hover:not(:disabled) { background: var(--hl-soft); } }
+.icon-btn:disabled { opacity: .35; cursor: default; }
+
+
+.server-warn {
+  margin: 12px auto 0; max-width: 46rem; padding: 10px 14px; border-radius: var(--radius);
+  background: #fde6e1; color: #7a2414; font-size: 14px; border: 1px solid #f3c2b6;
+}
+
+/* ---------- боковые панели ---------- */
+.panel {
+  position: fixed; top: 0; bottom: 0; width: min(380px, 90vw); z-index: 40;
+  background: var(--surface); display: flex; flex-direction: column;
+  transition: transform .25s ease;
+}
+.panel.lib { left: 0; border-right: 1px solid var(--line); transform: translateX(-102%); }
+.panel.toc { right: 0; border-left: 1px solid var(--line); transform: translateX(102%); }
+.panel.open { transform: none; box-shadow: 0 0 40px rgba(0,0,0,.18); }
+.panel-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 12px 12px 18px; font-weight: 650; border-bottom: 1px solid var(--line); }
+.panel-head .count { color: var(--muted); font-weight: 500; margin-left: 4px; }
+#tocList { overflow: auto; padding: 8px 0 24px; }
+/* закрытая панель уехала за край экрана — её длинный список (1000+ глав) браузер не раскладывает */
+#libList { content-visibility: auto; contain-intrinsic-size: auto 600px; }
+#tocList .tocgrp { content-visibility: auto; contain-intrinsic-size: auto 2000px; } /* высота — по числу ссылок, из app.js */
+#tocList a {
+  display: block; padding: 7px 18px; color: var(--ink); text-decoration: none; font-size: 14px; line-height: 1.35;
+  border-left: 3px solid transparent;
+}
+@media (hover: hover) { #tocList a:hover { background: var(--hl-soft); } }
+#tocList a.current { border-left-color: var(--accent); background: var(--hl-soft); font-weight: 600; }
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.25); z-index: 30; opacity: 0; pointer-events: none; transition: opacity .25s; }
+.scrim.show { opacity: 1; pointer-events: auto; }
+
+/* ---------- библиотека ---------- */
+.lib-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.lib-tools #libSearch { grid-column: 1 / -1; grid-row: 2; }
+.lib-tools input[type=search], .lib-tools select {
+  height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 14px; min-width: 0;
+}
+.btn-add {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px 0 8px; border-radius: 8px;
+  background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 14px; cursor: pointer;
+}
+.btn-add svg { width: 18px; height: 18px; }
+.lib-list { flex: 1; overflow: auto; padding: 6px 0; }
+.lib-empty { padding: 32px 22px; color: var(--muted); text-align: center; line-height: 1.6; font-size: 14px; }
+.lib-item { position: relative; border-left: 3px solid transparent; }
+.lib-item.current { border-left-color: var(--accent); background: var(--hl-soft); }
+.lib-open {
+  display: flex; gap: 12px; width: 100%; padding: 10px 44px 10px 14px; border: 0; background: none; text-align: left; cursor: pointer; color: var(--ink);
+}
+@media (hover: hover) { .lib-open:hover { background: var(--hl-soft); } }
+.lib-cover { flex: none; width: 46px; height: 64px; border-radius: 4px; overflow: hidden; background: var(--line); box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+.lib-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lib-cover .ph {
+  width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: hsl(var(--h) 38% 46%); color: #fff;
+}
+.lib-cover .ph b { font-family: var(--font-read); font-size: 22px; line-height: 1; }
+.lib-cover .ph small { font-size: 8.5px; letter-spacing: .06em; opacity: .85; margin-top: 4px; }
+.lib-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.lib-title { font-weight: 600; font-size: 14px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lib-author { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-meta { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.badge { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; padding: 1px 5px; border-radius: 4px; background: var(--line); color: var(--ink); }
+.lib-progress { height: 3px; border-radius: 2px; background: var(--line); margin-top: 5px; overflow: hidden; }
+.lib-progress i { display: block; height: 100%; background: var(--accent); }
+.lib-more { position: absolute; top: 10px; right: 6px; font-size: 18px; min-width: 32px; height: 32px; color: var(--muted); }
+.lib-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 12px 72px; }
+.lib-actions button {
+  height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; font-size: 13px;
+}
+@media (hover: hover) { .lib-actions button:hover { border-color: var(--accent); } }
+.lib-actions .danger { color: #c0392b; }
+.lib-actions .confirm { flex-basis: 100%; font-size: 13px; }
+.lib-actions label { flex-basis: 100%; display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.lib-actions input { height: 32px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 14px; }
+.lib-foot #libUsage { line-height: 1.4; }
+.link-danger { white-space: nowrap; }
+.lib-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); min-height: 40px; }
+.link-danger { border: 0; background: none; color: #c0392b; cursor: pointer; font-size: 12.5px; padding: 4px; }
+
+/* ---------- пустое состояние ---------- */
+main { padding: 0 16px calc(var(--player-h) + 40px); }
+.empty { display: flex; flex-direction: column; align-items: center; gap: 30px; min-height: calc(100vh - 200px); padding: 24px 0 32px; }
+/* блок «Добавить» — только на ПК, пока перетаскивают файлы; стоит выше всех книг */
+.drop { display: none; }
+html:not(.native) body.dragging .drop { display: block; }
+html:not(.native) body.dragging .home-empty { display: none; }
+.drop {
+  width: min(520px, 100%); padding: 44px 32px; text-align: center; cursor: pointer;
+  border: 2px dashed var(--line); border-radius: 18px; background: var(--surface);
+  transition: border-color .2s, transform .2s;
+}
+body.dragging .drop { border-color: var(--accent); transform: translateY(-2px); }
+@media (hover: hover) { .drop:hover { border-color: var(--accent); transform: translateY(-2px); } }
+.drop-mark svg { width: 38px; height: 38px; }
+.drop-mark {
+  display: inline-grid; place-items: center; width: 72px; height: 88px; margin-bottom: 14px;
+  border-radius: 6px 14px 14px 6px; background: var(--accent); color: var(--accent-ink);
+  font-weight: 800; letter-spacing: .04em; box-shadow: inset 6px 0 0 rgba(0,0,0,.15);
+}
+.drop h1 { margin: 0 0 8px; font-family: var(--font-read); font-weight: 600; font-size: 28px; }
+.drop p { margin: 6px 0; color: var(--muted); line-height: 1.5; }
+.drop .hint { font-size: 13px; margin-top: 14px; }
+.drop .formats { font-size: 12px; letter-spacing: .03em; color: var(--ink); opacity: .7; }
+.recent { width: min(860px, 100%); }
+.recent h2 { font-family: var(--font-read); font-weight: 600; font-size: 20px; margin: 0 0 14px; }
+.recent-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 18px; }
+.recent-item { display: flex; flex-direction: column; gap: 6px; padding: 0; border: 0; background: none; cursor: pointer; text-align: left; color: var(--ink); min-width: 0; }
+.recent-item .lib-cover { width: 100%; height: auto; aspect-ratio: 2 / 3; }
+.recent-item .ph b { font-size: 36px; }
+.recent-item .ph small { font-size: 11px; }
+@media (hover: hover) { .recent-item:hover .lib-cover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,.18); } }
+.recent-item .lib-cover { transition: transform .2s, box-shadow .2s; }
+.r-title { font-size: 13px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.r-meta { font-size: 11.5px; color: var(--muted); }
+.reader pre { white-space: pre-wrap; font-size: .85em; text-align: left; }
+
+/* ---------- текст книги ---------- */
+.reader {
+  max-width: 42rem; margin: 0 auto; padding-top: 36px;
+  font-family: var(--font-read); font-size: var(--read-size); line-height: 1.65;
+  hyphens: auto; -webkit-hyphens: auto; text-align: justify;
+}
+.reader .cover { display: block; max-width: 260px; margin: 0 auto 28px; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+.reader .book-intro { text-align: center; margin-bottom: 40px; }
+.reader .book-intro .bi-author { color: var(--muted); font-size: .9em; }
+.reader .book-intro .bi-title { font-size: 1.7em; line-height: 1.2; margin: .2em 0 .6em; font-weight: 600; }
+.reader .annotation { font-size: .88em; color: var(--muted); text-align: left; border-left: 3px solid var(--line); padding-left: 14px; }
+
+/* прокрутка: невидимые группы глав не раскладываются (высота — по оценке из app.js sizeSections) */
+body:not(.paged) .reader > .secgrp { content-visibility: auto; contain-intrinsic-size: auto 2000px; }
+.reader p { margin: 0; text-indent: 1.5em; }
+.reader p.cont { text-indent: 0; } /* продолжение очень длинного абзаца */
+.reader h2, .reader h3, .reader h4 { text-align: center; font-weight: 600; line-height: 1.3; margin: 2.2em 0 1em; text-indent: 0; hyphens: manual; }
+.reader h2 { font-size: 1.45em; }
+.reader h3 { font-size: 1.2em; }
+.reader h4 { font-size: 1.05em; }
+.reader .subtitle { text-align: center; font-weight: 600; margin: 1.2em 0 .6em; text-indent: 0; }
+.reader .epigraph { margin-left: 35%; font-size: .9em; font-style: italic; text-indent: 0; text-align: left; }
+.reader .cite { margin: 0 2em; font-size: .94em; }
+.reader .verse { text-indent: 0; margin-left: 2em; text-align: left; }
+.reader .author { text-align: right; font-style: italic; text-indent: 0; margin-bottom: 1em; }
+.reader .empty-line { height: 1em; }
+.reader .figure { display: block; max-width: 100%; margin: 1.2em auto; border-radius: 4px; }
+
+.seg { border-radius: 4px; cursor: pointer; transition: background .2s, color .2s; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+@media (hover: hover) { .seg:hover { background: var(--hl-soft); } }
+.seg.current { background: var(--hl); color: var(--hl-ink); }
+
+/* ---------- плеер ---------- */
+.player {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 25;
+  background: var(--surface); border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 30px rgba(0,0,0,.06); padding: 0 16px 12px;
+}
+.progress-row { max-width: 1100px; margin: 0 auto; }
+#seek { width: 100%; margin: 0; height: 22px; accent-color: var(--accent); cursor: pointer; }
+.controls-row { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 18px; }
+.transport { display: flex; align-items: center; gap: 14px; }   /* кнопки не вплотную: мимо не нажать */
+.play-btn {
+  position: relative; display: grid; place-items: center; width: 52px; height: 52px; margin: 0 4px;
+  border: 0; border-radius: 50%; background: var(--accent); color: var(--accent-ink); cursor: pointer;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.play-btn svg { width: 26px; height: 26px; grid-area: 1/1; }
+.play-btn:disabled { opacity: .4; cursor: default; box-shadow: none; }
+.play-btn .ic-pause, .play-btn .spinner { display: none; }
+.playing .play-btn .ic-play { display: none; }
+.playing .play-btn .ic-pause { display: block; }
+.loading .play-btn svg { display: none; }
+.loading .play-btn .spinner { display: block; }
+.spinner { grid-area: 1/1; width: 22px; height: 22px; border-radius: 50%; border: 3px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.status { flex: 1; min-width: 0; }
+.status-main { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status-sub { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+.settings { display: flex; align-items: center; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--muted); }
+.field select {
+  height: 34px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); font-size: 14px; cursor: pointer;
+}
+.field.vol { flex-direction: row; align-items: center; gap: 6px; color: var(--ink); }
+.field.vol svg { width: 20px; height: 20px; }
+.field.vol input { width: 90px; accent-color: var(--accent); }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(var(--player-h) + 16px); transform: translate(-50%, 20px);
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px;
+  opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; z-index: 50; max-width: 90vw;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 760px) {
+  :root { --player-h: 168px; --read-size: 18px; }
+  .controls-row { flex-wrap: wrap; gap: 8px 12px; }
+  .status { order: -1; flex-basis: 100%; }
+  .settings { margin-left: auto; }
+  .field.vol { display: none; }
+  .reader { text-align: left; }
+  .reader .epigraph { margin-left: 15%; }
+}
+
+/* ---------- постраничный режим ---------- */
+.page-nav, .page-num { display: none; }
+/* плашка «Сервер недоступен» — над страницами, а страницы начинаются ниже неё (--warn-h ставит app.js) */
+body.paged .server-warn:not([hidden]) { position: fixed; top: var(--top-h); left: 0; right: 0; z-index: 15; }
+body.paged main {
+  position: fixed; top: calc(var(--top-h) + var(--warn-h, 0px)); bottom: var(--player-h); left: 0; right: 0;
+  padding: 0; overflow: hidden;
+}
+body.paged .pager { position: absolute; top: 28px; left: 50%; transform: translateX(-50%); overflow: hidden; z-index: 2; }
+body.paged .reader {
+  max-width: none; margin: 0; padding: 0; height: 100%;
+  column-fill: auto; text-align: justify;
+  transition: transform .28s ease;
+}
+body.paged.no-anim .reader { transition: none; }
+body.paged .reader .book-intro { break-after: column; }
+body.paged .reader h2 { break-before: column; margin-top: 0; padding-top: .4em; }
+body.paged .reader h2, body.paged .reader h3, body.paged .reader h4, body.paged .reader .subtitle { break-after: avoid; }
+body.paged .reader img.figure, body.paged .reader .cover { max-height: calc(var(--page-h) * .8); object-fit: contain; break-inside: avoid; }
+body.paged .reader .cover { max-height: calc(var(--page-h) * .62); }
+/* боковые кнопки листания — в полях, ширина полей считается по их размеру */
+body.paged .page-nav {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 68px; padding: 14px 0 12px; border-radius: 16px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); cursor: pointer; z-index: 3;
+  font-size: 12px; font-weight: 600; letter-spacing: .01em;
+  box-shadow: 0 4px 16px rgba(0,0,0,.10); transition: background .2s, color .2s, border-color .2s, transform .15s, opacity .2s;
+}
+body.paged .page-nav svg { width: 28px; height: 28px; }
+@media (hover: hover) { body.paged .page-nav:hover:not(:disabled) { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); } }
+body.paged .page-nav:active:not(:disabled) { transform: translateY(-50%) scale(.95); }
+body.paged .page-nav:disabled { opacity: .3; cursor: default; box-shadow: none; }
+body.paged .page-nav.prev { left: 14px; }
+body.paged .page-nav.next { right: 14px; }
+
+/* нижняя полоса: номер страницы; на узких экранах — ещё и кнопки */
+.page-bar { display: none; }
+body.paged .page-bar {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  position: absolute; bottom: 6px; left: 0; right: 0; height: 32px; z-index: 3;
+}
+.page-btn {
+  display: none; align-items: center; gap: 4px; height: 32px; padding: 0 14px; border-radius: 16px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.page-btn svg { width: 16px; height: 16px; }
+@media (hover: hover) { .page-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); } }
+.page-btn:disabled { opacity: .35; cursor: default; }
+.page-btn:focus:not(:focus-visible), .page-nav:focus:not(:focus-visible) { outline: none; }
+body.paged .page-num { display: inline; position: static; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 64px; text-align: center; }
+body.paged.nav-bottom .page-nav { display: none; }
+body.paged.nav-bottom .page-btn { display: inline-flex; }
+body.paged.spread .pager::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px;
+  background: linear-gradient(transparent, var(--line) 15%, var(--line) 85%, transparent);
+}
+@media (max-width: 760px) {
+
+}
+
+/* ---------- шапка: книги | название | оглавление ---------- */
+.topbar { gap: 8px; }
+.topbar .icon-btn { min-width: 44px; height: 44px; }
+.topbar .icon-btn svg { width: 24px; height: 24px; }
+.book-title { font-size: 15.5px; }
+
+/* ---------- левая панель: книги и настройки ---------- */
+.lib-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.panel-head .back { font-size: 26px; min-width: 36px; margin-right: 4px; }
+.panel-head #libHeadTitle { flex: 1; }
+.lib-foot { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 14px 12px; }
+.lib-foot-info { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.btn-settings, .set-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; height: 42px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.btn-settings svg, .set-btn svg { width: 20px; height: 20px; }
+@media (hover: hover) { .btn-settings:hover, .set-btn:hover { border-color: var(--accent); color: var(--accent); } }
+html.native .set-btn.native-only { display: flex !important; }
+.set-view { flex: 1; overflow: auto; padding: 16px 16px 24px; display: flex; flex-direction: column; gap: 16px; }
+.set-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.set-field select, .set-field input:not([type=checkbox]):not([type=radio]) {
+  height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); font-size: 15.5px; font-weight: 400; cursor: pointer;
+}
+.set-field input:not([type=checkbox]):not([type=radio]) { cursor: text; min-width: 0; }
+.set-hint { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 4px 0 0; }
+
+/* ---------- плеер: скорость в одной строке с кнопками ---------- */
+.field.rate select { height: 40px; min-width: 76px; font-weight: 600; }
+@media (max-width: 760px) {
+  .settings { gap: 8px; }
+  .transport { gap: 12px; }
+  .transport .icon-btn { min-width: 44px; height: 44px; }
+}
+
+/* ---------- озвучка без интернета (приложение) ---------- */
+.toc-tools { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+html.native .toc-tools.native-only { display: block !important; }
+.toc-tools .set-btn { width: 100%; }
+.lib-audio { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 10px; width: fit-content; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-audio svg { width: 13px; height: 13px; flex: none; }
+.lib-audio.ok { background: color-mix(in srgb, #2e9d57 18%, transparent); color: #24834a; }
+.lib-audio.part { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.lib-audio.run { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+.lib-audio.net { background: var(--line); color: var(--muted); font-weight: 500; }
+.lib-audio.err { background: color-mix(in srgb, #c0392b 15%, transparent); color: #c0392b; }
+html[data-theme="dark"] .lib-audio.ok { color: #6fd194; }
+
+.modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.42); }
+.modal[hidden] { display: none; }
+.modal-card { width: min(460px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; background: var(--surface); color: var(--ink); border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.3); overflow: hidden; }
+.modal-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow: auto; }
+.dl-book { font-weight: 650; font-size: 15px; line-height: 1.35; }
+.dl-book small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.dl-mode { display: flex; gap: 18px; font-weight: 500; color: var(--ink); font-size: 15px; }
+.dl-mode label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.dl-mode input { accent-color: var(--accent); width: 18px; height: 18px; }
+.dl-range { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dl-range label { display: flex; flex-direction: column; gap: 4px; font-weight: 500; min-width: 0; }
+.dl-range select { height: 42px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 14px; min-width: 0; width: 100%; }
+.dl-est { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.dl-bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.dl-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+.dl-text { font-size: 13px; margin-top: 6px; line-height: 1.45; }
+.dl-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.dl-actions .set-btn { flex: 1; min-width: 140px; }
+.set-btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+@media (hover: hover) { .set-btn.primary:hover { color: var(--accent-ink); filter: brightness(1.06); } }
+.set-btn[hidden], .link-danger[hidden] { display: none !important; }
+@media (max-width: 420px) { .dl-range { grid-template-columns: 1fr; } }
+
+/* ---------- каталог сервера ---------- */
+.btn-cat {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px 0 8px; border-radius: 8px;
+  border: 1px solid var(--accent); background: transparent; color: var(--accent); font-weight: 600; font-size: 14px; cursor: pointer;
+}
+.btn-cat svg { width: 19px; height: 19px; }
+@media (hover: hover) { .btn-cat:hover { background: var(--hl-soft); } }
+.cat-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.cat-tools { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.cat-tools input { height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 14px; min-width: 0; }
+.cat-tools .icon-btn { font-size: 20px; }
+.cat-list { flex: 1; overflow: auto; padding: 4px 0 10px; }
+.cat-folder { padding: 12px 18px 4px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.cat-item { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 9px 14px 9px 18px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.cat-info { min-width: 0; }
+.cat-title { font-weight: 600; font-size: 14.5px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.cat-author { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cat-meta { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.cat-btn { height: 34px; min-width: 92px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 13.5px; cursor: pointer; }
+.cat-btn.have { background: transparent; color: var(--accent); }
+.cat-btn:disabled { opacity: .6; cursor: progress; }
+.cat-msg { padding: 28px 22px; text-align: center; color: var(--muted); line-height: 1.6; font-size: 14px; }
+.cat-foot { padding: 10px 16px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); line-height: 1.45; }
+
+/* ---------- какие главы озвучены ---------- */
+#tocList a.dl-ok::after { content: " ✓"; color: #2e9d57; font-weight: 700; }
+#tocList a.dl-part::after { content: " ◐"; color: var(--accent); }
+.dl-chapters { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 13px; }
+.dl-ch-sum { line-height: 1.5; margin-bottom: 6px; }
+.dl-ch-list { max-height: 198px; overflow: auto; overscroll-behavior: contain; }
+.dl-ch { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; align-items: center; line-height: 22px; }
+.dl-ch b { font-weight: 700; text-align: center; }
+.dl-ch span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-ch small { color: var(--muted); }
+.dl-ch.ok b { color: #2e9d57; }
+.dl-ch.part b { color: var(--accent); }
+.dl-ch.none { color: var(--muted); }
+.lib-tools .btn-add, .lib-tools .btn-cat { justify-content: center; }
+.lib-tools #libSearch { grid-column: 1; grid-row: 2; }
+.lib-tools #libSort { grid-column: 2; grid-row: 2; }
+
+/* ---------- плашка о сервере: можно скрыть ---------- */
+.server-warn:not([hidden]) { display: flex; align-items: flex-start; gap: 10px; }
+.warn-text { flex: 1; line-height: 1.45; }
+.warn-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.warn-btn { height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid #e3a493; background: #fff6f3; color: #7a2414; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+html.native .warn-btn.native-only { display: inline-block !important; }
+.warn-x { border: 0; background: none; color: #7a2414; font-size: 16px; width: 30px; height: 30px; cursor: pointer; border-radius: 6px; }
+@media (hover: hover) { .warn-x:hover { background: rgba(0,0,0,.06); } }
+@media (max-width: 520px) { .server-warn:not([hidden]) { flex-wrap: wrap; } .warn-actions { width: 100%; justify-content: flex-end; } }
+html.native .set-field.native-only { display: flex !important; }
+.dl-ch-list { position: relative; }
+.dl-ch-pad { position: relative; }
+.dl-ch { position: absolute; left: 0; right: 0; height: 22px; }
+.cat-msg .set-btn { margin: 12px auto 0; padding: 0 16px; }
+
+/* ---------- окна-вопросы: соглашение, первый запуск, выбор голоса ---------- */
+#ask { z-index: 70; }
+.ask-body { font-size: 14.5px; line-height: 1.55; }
+.ask-body p { margin: 0; }
+.ask-body ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+.ask-body details { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.ask-body summary { cursor: pointer; font-weight: 600; }
+.ask-body pre { white-space: pre-wrap; font-size: 12px; line-height: 1.45; max-height: 240px; overflow: auto; margin: 8px 0 0; font-family: inherit; }
+.ask-body table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+.ask-body td { border-top: 1px solid var(--line); padding: 5px 4px; vertical-align: top; }
+.ask-body .step { color: var(--muted); font-size: 12.5px; }
+.ask-body b.big { font-size: 16px; }
+.ask-actions { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 16px 16px; border-top: 1px solid var(--line); }
+.ask-actions .set-btn { flex: 1 1 140px; padding: 0 12px; font-size: 14.5px; }
+#btnLicense { font-size: 14px; font-weight: 500; height: 40px; }
+
+/* ---------- очень маленькие экраны: смарт-часы, крошечные окна ---------- */
+@media (max-width: 300px), (max-height: 330px) {
+  :root { --top-h: 40px; --read-size: 15px; }
+  .topbar { padding: 3px 6px; gap: 2px; }
+  .topbar .icon-btn { min-width: 34px; height: 34px; padding: 0 4px; }
+  .topbar .icon-btn svg { width: 19px; height: 19px; }
+  .book-title { font-size: 12.5px; }
+  .book-author { display: none; }
+  main { padding-left: 10px; padding-right: 10px; }
+  .player { padding: 0 6px 4px; }
+  #seek { height: 14px; }
+  .controls-row { flex-wrap: nowrap; justify-content: center; gap: 0; }
+  .status, .settings { display: none !important; }
+  .play-btn { width: 40px; height: 40px; margin: 0 6px; }
+  .play-btn svg { width: 20px; height: 20px; }
+  .transport { gap: 6px; }
+  .transport .icon-btn { min-width: 36px; height: 36px; }
+  .drop { padding: 14px 10px; }
+  .drop h1 { font-size: 17px; margin: 4px 0; }
+  .drop-mark, .drop .formats, .drop .hint, .recent { display: none !important; }
+  .drop p { font-size: 13px; }
+  .panel { width: 100vw; }
+  .panel-head { padding: 6px 6px 6px 12px; font-size: 14px; }
+  .lib-tools { padding: 8px; gap: 6px; }
+  .lib-tools .btn-add span, .lib-tools .btn-cat span { display: none; }
+  .modal { padding: 0; }
+  .modal-card { width: 100%; max-height: 100%; height: 100%; border-radius: 0; }
+  .modal-body { padding: 10px; gap: 10px; }
+  .ask-body { font-size: 13px; }
+  .ask-actions { padding: 8px; gap: 6px; }
+  .ask-actions .set-btn { height: 36px; font-size: 13px; flex-basis: 100%; }
+  .set-field select, .set-field input:not([type=checkbox]):not([type=radio]), .dl-range select { height: 36px; font-size: 13.5px; }
+  .server-warn { margin: 6px; font-size: 12px; padding: 6px 8px; }
+  .toast { font-size: 12px; padding: 6px 10px; }
+  body.paged .page-bar { padding: 0 4px; }
+  .page-btn span { display: none; }
+  .reader h1, .reader h2, .reader h3, .reader .book-intro .bi-title { font-size: 1.15em !important; margin: .6em 0 .4em !important; }
+  .lib-foot { padding: 6px 8px; gap: 4px; min-height: 0; }
+  .lib-foot .btn-settings { height: 32px; font-size: 13px; }
+  #libUsage, #libClear, .lib-tools #libSearch, .lib-tools #libSort, .lib-foot-info { display: none !important; }
+  .lib-item { padding: 6px 8px; }
+  .lib-cover { width: 30px; height: 42px; }
+}
+/* круглые часы: углы экрана срезаны — отодвигаем содержимое от краёв */
+@media (max-width: 300px) and (min-aspect-ratio: 9/10) and (max-aspect-ratio: 10/9) {
+  .topbar { padding-left: 14%; padding-right: 14%; }
+  main { padding-left: 12%; padding-right: 12%; }
+  .player { padding-left: 16%; padding-right: 16%; padding-bottom: 8%; }
+  .panel-head, .lib-tools, .modal-body, .ask-actions { padding-left: 12%; padding-right: 12%; }
+}
+
+/* ---------- озвучки книги (окно загрузки) ---------- */
+.dl-packs { border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
+.dl-packs-head { font-size: 13px; font-weight: 700; color: var(--muted); padding: 4px 0 6px; }
+.dl-pack { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); }
+.dl-pack-info { min-width: 0; font-size: 14px; }
+.dl-pack-info small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 1px; }
+.dl-pack-tag { font-size: 11px; font-weight: 700; color: var(--accent); background: var(--hl-soft); border-radius: 6px; padding: 1px 6px; }
+.dl-pack.cur b { color: var(--accent); }
+.dl-pack-btn { height: 34px; min-width: 40px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; font-size: 13.5px; }
+.dl-pack-btn.danger { color: #c0392b; }
+@media (hover: hover) { .dl-pack-btn:hover { border-color: var(--accent); } }
+.lib-actions .confirm { flex-basis: 100%; font-size: 13px; }
+.ask-actions.col .set-btn { flex-basis: 100%; height: auto; min-height: 42px; padding: 6px 12px; }
+
+/* ---------- выбор нескольких книг ---------- */
+.lib-check { position: absolute; left: 10px; top: 50%; width: 24px; height: 24px; margin-top: -12px; border-radius: 7px;
+  border: 2px solid var(--muted); background: var(--surface); display: grid; place-items: center; opacity: 0; transform: scale(.6);
+  transition: opacity .18s, transform .18s; pointer-events: none; z-index: 1; }
+.lib-check svg { width: 16px; height: 16px; color: var(--accent-ink); opacity: 0; }
+.lib-open { transition: padding-left .18s ease; }
+.selecting .lib-open { padding-left: 48px; }           /* книга сдвигается внутри строки — ширина списка не меняется */
+.selecting .lib-check { opacity: 1; transform: none; }
+.selecting .lib-more { display: none; }
+.selecting .lib-item.sel { background: var(--hl-soft); }
+.selecting .lib-item.sel .lib-check { background: var(--accent); border-color: var(--accent); }
+.selecting .lib-item.sel .lib-check svg { opacity: 1; }
+#btnSelect svg { width: 22px; height: 22px; }
+.selecting #btnSelect { color: var(--accent); background: var(--hl-soft); }
+.sel-bar { display: grid; grid-template-columns: auto 1fr repeat(4, auto); align-items: center; gap: 4px; padding: 8px 10px;
+  border-top: 1px solid var(--line); background: var(--surface); }
+.sel-bar[hidden] { display: none; }
+.sel-count { font-size: 13.5px; font-weight: 600; padding-left: 4px; white-space: nowrap; }
+.sel-btn { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 52px; padding: 4px 6px; border: 0; border-radius: 8px;
+  background: none; color: var(--ink); cursor: pointer; font-size: 11px; }
+.sel-btn svg { width: 22px; height: 22px; }
+@media (hover: hover) { .sel-btn:hover:not(:disabled) { background: var(--hl-soft); } }
+.sel-btn:disabled { opacity: .35; cursor: default; }
+.sel-btn.danger { color: #c0392b; }
+html.native .sel-btn.native-only { display: flex !important; }
+.selecting .lib-foot { display: none; }
+@media (max-width: 300px), (max-height: 330px) { .sel-btn span { display: none; } .sel-btn { min-width: 36px; } }
+
+/* ---------- очередь загрузки озвучки ---------- */
+.dl-queue { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12.5px; line-height: 1.35;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface)); border-bottom: 1px solid var(--line); }
+.dl-queue[hidden] { display: none; }
+.dl-queue span { flex: 1; min-width: 0; }
+.dl-queue.warn { background: #fde6e1; color: #7a2414; }
+.dl-queue.ok { background: color-mix(in srgb, #2e9d57 14%, var(--surface)); }
+.dl-queue-btn { flex: none; height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12.5px; }
+
+/* ---------- вложенные прокрутки ----------
+   Дошли до конца внутреннего списка (оглавление, библиотека, каталог, главы, окно) — прокрутка не «проваливается»
+   во внешний блок: книга под панелью остаётся на месте. Пока открыта панель или окно, страница под ними не прокручивается. */
+#tocList, .lib-list, .set-view, .modal-body, .cat-list, .dl-ch-list, .ask-body pre, .panel { overscroll-behavior: contain; }
+html.scroll-lock, html.scroll-lock body { overflow: hidden; }
+html.scroll-lock body { overscroll-behavior: none; }
+
+/* низкий экран (часы, телефон в альбомной ориентации): плашка сервера — компактно, в одну-две строки,
+   иначе на часах она занимает весь экран и страницы уходят под плеер. Полный текст — во всплывающей подсказке. */
+@media (max-height: 420px) {
+  .server-warn { margin: 4px; padding: 4px 8px; font-size: 11.5px; }
+  .server-warn:not([hidden]) { flex-wrap: nowrap; align-items: center; gap: 6px; }
+  .warn-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
+  .warn-actions { width: auto; }
+  .warn-btn { height: 24px; padding: 0 6px; font-size: 11px; }
+  .warn-x { width: 24px; height: 24px; font-size: 13px; }
+}
+@media (max-height: 300px) {
+  .warn-text { -webkit-line-clamp: 1; }
+  html .server-warn .warn-btn, html.native .server-warn .warn-btn.native-only { display: none !important; } /* «Работать без сервера» — в настройках; на часах места нет */
+}
+
+/* подсказки только для браузера / только для приложения */
+html.native .web-only { display: none !important; }
+html.native .set-hint.native-only { display: block !important; }
+
+/* ---------- место чтения ---------- */
+/* выбранная касанием фраза: ▶ или двойное касание — читать с неё (место чтения пока не меняется) */
+.seg.pick { outline: 2px dashed var(--accent); outline-offset: 1px; background: var(--hl-soft); }
+.seg.current.pick { outline-style: solid; }
+
+/* ползунок: метка места чтения и подсказка главы при перетаскивании */
+.progress-row { position: relative; }
+.seek-mark {
+  position: absolute; top: 50%; width: 4px; height: 14px; margin: -7px 0 0 -2px; border-radius: 2px;
+  background: var(--accent); opacity: .85; pointer-events: none; box-shadow: 0 0 0 2px var(--surface);
+}
+.seek-tip {
+  position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%); max-width: min(80vw, 360px);
+  padding: 5px 10px; border-radius: 8px; background: var(--ink); color: var(--surface); font-size: 12.5px; line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; z-index: 30;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25);
+}
+
+/* «К месту чтения» — справа снизу над плеером, когда место чтения не на экране.
+   Появляется с подписью, потом сворачивается в точку (.dot) и становится полупрозрачной (.dim). */
+.to-reading {
+  position: fixed; right: 14px; bottom: calc(var(--player-h, 120px) + 12px); z-index: 24;
+  display: inline-flex; align-items: center; height: 44px; min-width: 44px; padding: 0 16px 0 11px; border-radius: 22px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--accent); font: inherit; font-size: 14px; font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0,0,0,.16); cursor: pointer; overflow: hidden; white-space: nowrap;
+  transition: padding .35s ease, opacity .35s ease, box-shadow .35s ease;
+  animation: to-reading-in .25s ease-out;
+}
+.to-reading svg { width: 22px; height: 22px; flex: none; }
+.to-reading span { display: inline-block; max-width: 180px; margin-left: 7px; opacity: 1; transition: max-width .35s ease, margin .35s ease, opacity .25s ease; }
+.to-reading.dot { padding: 0 10px; }
+.to-reading.dot span { max-width: 0; margin-left: 0; opacity: 0; }
+.to-reading.dim { opacity: .45; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+.to-reading.dim:focus-visible, .to-reading.dim:active { opacity: 1; }
+@media (hover: hover) { .to-reading.dim:hover { opacity: 1; } }
+.to-reading.pressed, .to-reading:active { opacity: 1; transform: scale(.92); background: var(--hl-soft); }
+.to-reading { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.to-reading[hidden] { display: none; }
+@keyframes to-reading-in { from { opacity: 0; transform: translateY(8px) scale(.9); } to { opacity: 1; transform: none; } }
+body.paged .to-reading { bottom: calc(var(--player-h, 120px) + 56px); }  /* над полосой страниц */
+/* точное место (правый нижний угол текста / страницы) задаёт app.js — positionToReading() */
+
+/* «↩ Вернуться» после перехода во время чтения */
+.undo-bar {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--player-h, 120px) + 12px); z-index: 26;
+  display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 24px); padding: 8px 8px 8px 14px; border-radius: 12px;
+  background: var(--ink); color: var(--surface); font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.25);
+}
+.undo-bar[hidden] { display: none; }
+.undo-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.undo-bar button { flex: none; border: 0; border-radius: 8px; padding: 6px 10px; background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; }
+body.paged .undo-bar { bottom: calc(var(--player-h, 120px) + 56px); }
+html.scroll-lock .to-reading, html.scroll-lock .undo-bar { display: none; }
+@media (max-height: 420px) { .to-reading span { display: none; } .to-reading { padding: 0 10px; } }
+
+
+/* ---------- оглавление: поиск глав ---------- */
+.toc-auto { padding: 10px 16px 4px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.toc-auto p { margin: 0; line-height: 1.5; }
+.toc-auto .set-hint { margin: 0; }
+.link-btn { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+.chap-vars { display: flex; flex-direction: column; gap: 8px; }
+.chap-var { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.chap-var input { margin-top: 3px; accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+.chap-var small { color: var(--muted); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 330px; }
+.chap-var span { min-width: 0; }
+.chap-prev { border: 1px solid var(--line); border-radius: 10px; min-height: 180px; max-height: min(48vh, 420px); overflow: auto; padding: 4px 0; background: var(--bg); }
+.chap-prev-head { font-weight: 600; padding: 4px 10px 6px; font-size: 13px; color: var(--muted); }
+.chap-prev-row { padding: 3px 10px; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chap-prev-row.more { color: var(--muted); }
+.set-btn:disabled { opacity: .45; cursor: default; }
+
+/* ---------- таймер сна ---------- */
+.sleep-btn { position: relative; }
+.sleep-btn.on { color: var(--accent); }
+.sleep-left { position: absolute; right: -2px; top: -2px; min-width: 18px; padding: 0 4px; height: 16px; border-radius: 8px;
+  background: var(--accent); color: var(--accent-ink); font-size: 10.5px; font-weight: 700; line-height: 16px; text-align: center; }
+
+/* ---------- «Произношение» (pron.js): окна правила и папки ---------- */
+.pr { display: flex; flex-direction: column; gap: 12px; }
+.pr-empty, .pr-none { color: var(--muted); font-size: 13.5px; padding: 6px 2px; }
+.pr-line { display: flex; align-items: center; gap: 6px; }
+.pr-line input.pr-w, .pr-line input.pr-s {
+  flex: 1; min-width: 0; height: 38px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); font-size: 15px;
+}
+.pr-line input.bad { border-color: #c0392b; }
+.pr-case { display: flex; align-items: center; gap: 3px; font-size: 13px; color: var(--muted); cursor: pointer; flex: none; }
+.pr-case input { accent-color: var(--accent); width: 16px; height: 16px; }
+.pr-line .icon-btn { flex: none; width: 44px; height: 44px; font-size: 16px; border: 1px solid var(--line); border-radius: 10px; }
+.pr-confirm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; }
+.pr-confirm[hidden] { display: none; }
+.pr-confirm span { flex: 1 1 100%; }
+.pr-confirm .set-btn { flex: 1; height: 38px; font-size: 14px; }
+.set-btn.danger { color: #c0392b; border-color: #c0392b; }
+/* подтверждение необратимого действия («Удалить», «Сбросить», «Очистить») — красная основная кнопка */
+.set-btn.primary.danger { background: #c0392b; border-color: #c0392b; color: #fff; }
+@media (hover: hover) { .set-btn.primary.danger:hover { color: #fff; filter: brightness(1.08); } }
+.r-meta .lib-ab, .home-meta .lib-ab { vertical-align: -2px; margin-right: 3px; }
+.pr-err { color: #c0392b; font-size: 12.5px; }
+.pr-opt, .pr-book { display: flex; align-items: center; gap: 8px; font-size: 13.5px; padding: 3px 0; cursor: pointer; }
+.pr-opt input, .pr-book input { accent-color: var(--accent); }
+.pr-books { max-height: 180px; overflow: auto; padding: 4px 0 0 22px; }
+.pr-sub { font-size: 12px; color: var(--muted); margin-top: 6px; font-weight: 600; }
+.pr-help { font-size: 13.5px; }
+.pr-help summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+.pr-help ul { padding-left: 18px; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; line-height: 1.45; }
+.modal.pr-open { place-items: start center; }
+.modal.pr-open .modal-card { max-height: calc(100dvh - 32px); }
+.pr-unsaved { position: sticky; top: -16px; z-index: 2; margin: -16px -16px 0; padding: 12px 16px; background: var(--hl-soft);
+  border-bottom: 1px solid var(--line); font-size: 14px; display: flex; flex-direction: column; gap: 8px; }
+.pr-unsaved[hidden] { display: none; }
+.pr-u-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.pr-u-btns .set-btn { flex: 1; height: 38px; font-size: 13.5px; min-width: 0; padding: 0 6px; white-space: nowrap; }
+/* окно с прокруткой: тело сжимается, кнопки «Отмена»/«Сохранить» всегда видны внизу */
+.modal-card > .modal-body { min-height: 0; flex: 1 1 auto; }
+.modal-card > .ask-actions { flex: none; }
+.ask-actions:empty { display: none; }
+.pr-err { color: #b26a00; }
+.pr-unsaved span { font-size: 13.5px; }
+
+/* ---------- страница «Произношение» 2.0 (pron.js) ---------- */
+.prp { position: fixed; inset: 0; z-index: 65; background: rgba(0,0,0,.42); display: flex; justify-content: center; }
+.prp-card { width: min(760px, 100%); height: 100%; display: flex; flex-direction: column; background: var(--surface); color: var(--ink); box-shadow: 0 0 40px rgba(0,0,0,.25); }
+.prp-head { padding-left: 6px; gap: 6px; }
+.prp-title { flex: 1; font-size: 17px; }
+.prp-back { font-size: 26px; line-height: 1; }
+.prp-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 8px 12px 4px; font-size: 14px; }
+.prp-crumb { border: 0; background: none; color: var(--accent); font: inherit; padding: 6px 6px; border-radius: 6px; cursor: pointer; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: hover) { .prp-crumb:hover { background: var(--hl-soft); } }
+.prp-crumb.here { color: var(--ink); font-weight: 650; cursor: default; background: none; }
+.prp-sep { color: var(--muted); }
+.prp-tools { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 8px 14px 10px; border-bottom: 1px solid var(--line); }
+.prp-tools[hidden], .prp .sel-bar[hidden], .prp-io[hidden] { display: none; }
+.prp-tools .set-btn { height: 40px; min-width: 0; }
+.prp-search { grid-column: 1 / -1; height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 15px; min-width: 0; }
+.prp-check { accent-color: var(--accent); width: 20px; height: 20px; flex: none; margin: 0; }
+.prp-list { flex: 1; overflow: auto; overscroll-behavior: contain; padding: 4px 0 12px; }
+.prp-item { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 14px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.prp-check { display: none; }
+.prp.selecting .prp-check { display: block; }
+.prp.selecting .prp-more, .prp.selecting .prp-play { visibility: hidden; }
+.prp-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 0; background: none; color: inherit; font: inherit;
+  text-align: left; padding: 9px 4px; cursor: pointer; border-radius: 8px; min-height: 48px; }
+@media (hover: hover) { .prp-open:hover { background: var(--hl-soft); } }
+.prp-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.prp-main b { font-weight: 650; }
+.prp-ws { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prp-main small { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prp-where { color: var(--accent) !important; }
+.prp-aa { font-weight: 700; color: var(--ink); }
+.prp-ico { flex: none; width: 26px; height: 20px; border-radius: 3px 5px 5px 5px; background: var(--hl); position: relative; margin-top: 3px; }
+.prp-ico::before { content: ""; position: absolute; left: 0; top: -4px; width: 11px; height: 6px; border-radius: 3px 3px 0 0; background: var(--hl); }
+.prp-folder .prp-main b { font-size: 15px; }
+.prp-item .icon-btn { flex: none; width: 44px; height: 44px; font-size: 16px; border-radius: 10px; }
+.prp-more { font-size: 20px !important; color: var(--muted); }
+.prp-empty { padding: 32px 22px; text-align: center; color: var(--muted); line-height: 1.6; font-size: 14px; }
+.prp-io { display: flex; gap: 8px; padding: 10px 14px 12px; border-top: 1px solid var(--line); }
+.prp-io .set-btn { flex: 1; height: 38px; }
+@media (min-width: 761px) { .prp { padding: 16px 0; } .prp-card { border-radius: 14px; overflow: hidden; } }
+
+.pr-edit { gap: 14px; }
+.pr-field { display: flex; flex-direction: column; gap: 5px; }
+.pr-label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.pr-label small { font-weight: 400; }
+.pr-edit input.pr-w, .pr-edit input.pr-s, .pr-edit input.pr-name, .pr-edit select.pr-folder {
+  height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 16px; min-width: 0; width: 100%; }
+.pr-edit input.bad { border-color: #c0392b; }
+.pr-edit .pr-line input.pr-s { flex: 1; height: 44px; }
+.pr-edit .pr-case { font-size: 14px; color: var(--ink); gap: 8px; align-self: flex-start; padding: 2px 0; }
+.pr-edit .pr-case input { width: 20px; height: 20px; }
+.pr-scope2 { display: flex; flex-direction: column; gap: 4px; }
+.pr-scope2 .pr-books { max-height: 200px; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; margin-top: 4px; }
+.pr-hint { font-size: 13px; color: var(--muted); }
+.pr-err .link-btn { font-size: inherit; }
+.pr-foot { display: flex; gap: 8px; flex-wrap: wrap; position: sticky; bottom: -16px; margin: 0 -16px -16px; padding: 12px 16px;
+  background: var(--surface); border-top: 1px solid var(--line); }
+.pr-foot .set-btn { flex: 1; height: 44px; min-width: 0; }
+.pr-foot .pr-del { flex: 0 1 auto; margin-right: auto; }
+.pr-sum { margin: 0; }
+.pr-repl ul { margin-top: 8px; font-size: 13.5px; gap: 4px; max-height: 260px; overflow: auto; }
+
+/* «Произношение»: значок выбора, «..», перетаскивание, компактное меню */
+.prp-tools .prp-select { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 8px; }
+.prp-tools .prp-select svg { width: 22px; height: 22px; }
+.prp-ico.up { background: none; border: 2px solid var(--hl); }
+.prp-ico.up::before { background: var(--hl); }
+.prp-up .prp-main b { font-size: 16px; letter-spacing: .1em; }
+.prp.selecting .prp-up { display: none; }
+.prp-item, .lib-item { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.prp-item[draggable="true"] { cursor: grab; }
+.prp-item.dragging { opacity: .45; }
+.prp-item.drop-over, .prp-crumb.drop-over { background: var(--hl-soft); outline: 2px dashed var(--accent); outline-offset: -3px; border-radius: 8px; }
+.prp-rule .prp-play + .prp-more { margin-left: -4px; }
+#ask.pr-small .modal-card { width: min(360px, 100%); }
+#ask.pr-small .modal-body { padding: 8px 8px 10px; gap: 2px; }
+.pr-menu { display: flex; flex-direction: column; gap: 2px; }
+.pr-menu .pr-hint { padding: 2px 10px 8px; }
+.pr-mi { border: 0; background: none; color: var(--ink); font: inherit; font-size: 15px; text-align: left; padding: 0 12px; min-height: 44px;
+  border-radius: 8px; cursor: pointer; }
+.pr-mi:focus-visible { background: var(--hl-soft); }
+@media (hover: hover) { .pr-mi:hover { background: var(--hl-soft); } }
+.pr-mi.danger { color: #c0392b; }
+.prp-open, .pr-mi, .prp-item .icon-btn { -webkit-tap-highlight-color: transparent; }
+
+/* библиотека: избранное (звёздочка) */
+.lib-fav { position: absolute; top: 44px; right: 6px; min-width: 32px; height: 32px; padding: 0; color: var(--muted); }
+.lib-fav svg { width: 20px; height: 20px; fill: none; }
+.lib-fav.on { color: #e0a800; }
+.lib-fav.on svg { fill: #f5c518; }
+.selecting .lib-fav { display: none; }
+
+/* колонки с прокруткой: элементы не сжимаются (иначе кнопки в настройках и предпросмотр глав сплющивает) */
+.set-view > *, .modal-body > * { flex-shrink: 0; }
+/* «Произношение»: панель выбора внизу — как в библиотеке */
+.prp .sel-bar { border-top: 1px solid var(--line); }
+.prp .sel-count { white-space: nowrap; line-height: 1.25; font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.prp .sel-btn { min-width: 46px; padding: 4px 3px; }
+.prp-tools .prp-select.on { color: var(--accent); background: var(--hl-soft); border-color: var(--accent); }
+.prp .sel-count small { display: block; font-weight: 400; color: var(--muted); font-size: 11.5px; }
+.prp-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* «Озвучка без интернета»: озвучка ждёт обновления (шаг 5) */
+.dl-upd { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; padding: 10px 12px;
+  background: var(--hl-soft); display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; line-height: 1.45; }
+.dl-upd[hidden] { display: none; }
+.dl-upd p { margin: 0; }
+.dl-upd-hint { color: var(--muted); font-size: 12.5px; }
+.dl-upd .set-btn { align-self: flex-start; padding: 0 16px; }
+@media (max-width: 360px) { .sel-bar { gap: 2px; padding: 8px 6px; } .sel-btn { min-width: 44px; padding: 4px 2px; font-size: 10.5px; } }
+.dl-pack-info[data-pact="pick"] { cursor: pointer; border-radius: 6px; }
+@media (hover: hover) { .dl-pack:not(.cur) .dl-pack-info[data-pact="pick"]:hover b { text-decoration: underline; } }
+#dlRefresh[hidden] { display: none; }
+.dl-pack.picked { background: var(--hl-soft); border-radius: 8px; box-shadow: inset 3px 0 0 var(--accent); padding-left: 10px; padding-right: 4px; margin: 0 -4px; }
+/* «Освободить место» (настройки приложения) */
+.sp { display: flex; flex-direction: column; gap: 10px; }
+.sp-opt { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font-size: 14px; line-height: 1.4; }
+.sp-opt input { accent-color: var(--accent); width: 20px; height: 20px; flex: none; margin: 1px 0 0; }
+.sp-opt small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.sp-opt.off { opacity: .5; }
+.sp-opt.sub { margin: -4px 0 0 26px; }
+.sp-opt.danger b { color: #c0392b; }
+.sp-list { margin: 6px 0 10px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+/* обновления (настройки) */
+.set-upd > span { margin-bottom: 2px; }
+.upd-box { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 400; color: var(--ink); line-height: 1.45; }
+.upd-box:empty { display: none; }
+.upd-hint { font-size: 12.5px; color: var(--muted); }
+.upd-warn { font-size: 13px; color: #b26a00; }
+.upd-notes summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 13.5px; }
+.upd-notes pre { white-space: pre-wrap; font: inherit; font-size: 12.5px; max-height: 220px; overflow: auto; margin: 6px 0 0; }
+.upd-link { color: var(--accent); }
+
+/* автономный режим (приложение, шаг 7): всё про нейроозвучку и сервер скрыто; шаг 8 — плеер аудиокниг остаётся */
+html.autonomous .tts-only.tts-only.tts-only { display: none !important; }
+.auto-only { display: none !important; }
+html.autonomous .auto-only.auto-only { display: block !important; }
+html.autonomous .lib-tools .btn-add { grid-column: 1 / -1; }
+/* автономный режим — только чтение: ни места озвучки, ни выделения фразы касанием */
+html.autonomous .seg, html.autonomous .seg:hover, html.autonomous .seg.current, html.autonomous .seg.pick {
+  background: none; color: inherit; outline: none; cursor: auto;
+}   /* «Каталог» скрыт — «Добавить» во всю ширину */
+
+/* ---------- аудиокнига (шаг 8): обложка в середине, плеер внизу — общий с читалкой ---------- */
+.ab-stage { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 8px; text-align: center;
+  min-height: calc(100dvh - var(--top-h) - var(--player-h, 120px) - 24px); padding: 20px 16px; max-width: 640px; margin: 0 auto; }
+.ab-stage[hidden] { display: none; }
+.ab-cover { width: min(64vw, 300px, 36vh); aspect-ratio: 1; border-radius: 12px; overflow: hidden; flex: none;
+  background: var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.18); margin-bottom: 8px; }
+.ab-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ab-ph { width: 100%; height: 100%; display: grid; place-items: center; color: var(--muted); background: var(--hl-soft); }
+.ab-ph svg { width: 42%; height: 42%; }
+.ab-title { font-size: 20px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.ab-author { font-size: 14px; color: var(--muted); }
+.ab-chapter { border: 0; background: none; color: var(--ink); font: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer;
+  max-width: 100%; padding: 6px 10px; border-radius: 8px; overflow-wrap: anywhere; }
+.ab-chapter:empty { display: none; }
+@media (hover: hover) { .ab-chapter:hover { background: var(--hl-soft); } }
+/* в режиме аудиокниги нет текста: страницы, «к месту чтения», загрузка озвучки и разметка глав не нужны */
+html.ab-mode #pager, html.ab-mode #empty, html.ab-mode .page-nav, html.ab-mode .page-bar, html.ab-mode #toReading,
+html.ab-mode #undoBar, html.ab-mode #seekMark, html.ab-mode #serverWarn, html.ab-mode #tocAuto, html.ab-mode .toc-tools.toc-tools.native-only { display: none !important; }
+/* плеер внизу нужен аудиокниге и в автономном режиме */
+html.ab-mode #player.tts-only { display: block !important; }
+#tocList a.ab-toc { display: flex; gap: 10px; align-items: baseline; }
+#tocList a.ab-toc span { flex: 1; min-width: 0; }
+#tocList a.ab-toc small { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* библиотека: значок аудиокниги, фильтр «Книги / Аудиокниги» рядом с сортировкой */
+.lib-ab { width: 14px; height: 14px; flex: none; color: var(--accent); }
+/* «Библиотека / Книги / Аудиокниги» — вместо заголовка панели (только когда есть аудиокниги), лишней строки нет */
+.lib-kind { font: inherit; font-weight: 650; color: var(--ink); background: transparent; border: 0; padding: 4px 22px 4px 0; margin: -4px 0;
+  cursor: pointer; max-width: 100%; appearance: none; -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 9px top 55%, right 4px top 55%; background-size: 5px 5px; background-repeat: no-repeat; }
+.lib-kind[hidden] { display: none; }
+.lib-kind option { color: var(--ink); background: var(--surface); }
+html.native #selAudio.sel-btn.native-only[hidden] { display: none !important; }
+
+/* ---------- стартовый экран ---------- */
+.home-last { width: min(860px, 100%); }
+.home-card { display: flex; gap: 18px; width: 100%; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface);
+  color: var(--ink); text-align: left; cursor: pointer; font: inherit; box-shadow: 0 6px 20px rgba(0,0,0,.06); transition: transform .2s, box-shadow .2s; }
+@media (hover: hover) { .home-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0,0,0,.12); } }
+.home-card .lib-cover { width: 92px; height: 132px; border-radius: 6px; }
+.home-card .lib-cover img { width: 100%; height: 100%; object-fit: cover; }
+.home-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+.home-label { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+.home-title { font-family: var(--font-read); font-size: 20px; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+.home-author, .home-meta { font-size: 13px; color: var(--muted); }
+.home-info .lib-progress { margin-top: 6px; max-width: 320px; }
+.home-empty { text-align: center; max-width: 520px; display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 8vh; }
+.home-empty[hidden], .home-last[hidden] { display: none; }
+.home-empty h1 { margin: 6px 0; font-family: var(--font-read); font-weight: 600; font-size: 24px; }
+.home-empty p { margin: 4px 0; color: var(--muted); line-height: 1.5; }
+.home-empty .formats { font-size: 12px; opacity: .8; }
+.home-empty .set-btn { margin-top: 12px; padding: 0 18px; }
+@media (max-width: 760px) {
+  .empty { gap: 22px; padding: 14px 14px 24px; }
+  .home-card { padding: 12px; gap: 14px; }
+  .home-card .lib-cover { width: 72px; height: 104px; }
+  .home-title { font-size: 17px; }
+  .recent-list { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 14px; }
+}
+
+/* ---------- длинные слова без пробелов (названия, авторы, правила): переносятся, а не вылезают ---------- */
+body { overflow-wrap: break-word; }
+.lib-title, .lib-author, .r-title, .home-title, .home-author, .home-meta, #tocList a, #tocList a.ab-toc span,
+#askHead, .ask-body, .pr-hint, .prp-crumbs, .cat-title, .cat-author, .cat-folder,
+.status-main, .ab-title, .ab-author, .reader, .reader h1, .reader h2, .reader h3, .reader .book-intro { overflow-wrap: anywhere; }
+.prp-main > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-author, .home-author { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.home-title { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+#askHead { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-width: 0; }
+.lib-pct { white-space: nowrap; }
+
+/* аудиокнига: по центру, но если не помещается — сверху (обложка не уезжает под шапку); длинные названия — не больше 3 строк */
+.ab-stage > :first-child { margin-top: auto; }
+.ab-stage > :last-child { margin-bottom: auto; }
+.ab-title { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ab-author { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+@media (max-height: 520px) { .ab-cover { width: min(40vw, 30vh, 200px); } .ab-title { font-size: 17px; } }
+/* строка «формат · размер · процент» у книги: переносится целыми частями */
+.lib-meta { flex-wrap: wrap; row-gap: 0; }
+.lib-sz { white-space: nowrap; }
+/* узкий телефон: плеер в две строки (состояние / кнопки), кнопки и настройки помещаются в одну */
+@media (max-width: 360px) {
+  .controls-row { gap: 6px 8px; }
+  .transport { gap: 6px; }
+  .settings { gap: 4px; }
+  .field.rate select { min-width: 62px; padding: 0 4px; }
+}
+/* «Произношение» на низком экране (телефон лёжа): прокручивается всё окно, шапка, панель выбора и «Экспорт/Импорт» на месте */
+@media (max-height: 520px) {
+  .prp-card { overflow-y: auto; }
+  .prp-list { flex: none; overflow: visible; }
+  .prp-head { position: sticky; top: 0; z-index: 3; background: var(--surface); }
+  .prp .sel-bar, .prp-io { position: sticky; bottom: 0; z-index: 3; background: var(--surface); margin-top: auto; }
+}
+
+/* телефон (касание): кнопка и список после нажатия не остаются «зажатыми» — без рамки фокуса
+   (подсветка наведения выше — только там, где есть мышь: @media (hover: hover)) */
+@media (hover: none) {
+  button:focus, select:focus, input[type=range]:focus, a:focus, [tabindex]:focus { outline: none; }
+}
+
+/* ---------- свой выбор из списка (picker.js) вместо системного окна ---------- */
+.modal.pick { z-index: 80; }
+.pick .modal-card, .pick .modal-card.modal-card { width: min(360px, 100%); height: auto; max-height: min(78vh, 600px); border-radius: 14px; }
+.pick .panel-head { padding: 10px 8px 10px 18px; }
+.pick-head { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pick-list { overflow-y: auto; overscroll-behavior: contain; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.pick-it { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 8px 12px; border: 0; border-radius: 8px;
+  background: none; color: var(--ink); font: inherit; font-size: 15px; line-height: 1.3; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.pick-it span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pick-it svg { width: 18px; height: 18px; flex: none; color: var(--accent); visibility: hidden; }
+.pick-it.on { background: var(--hl-soft); font-weight: 650; }
+.pick-it.on svg { visibility: visible; }
+.pick-it:disabled { opacity: .45; cursor: default; }
+.pick-it:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (hover: hover) { .pick-it:hover:not(:disabled) { background: var(--hl-soft); } }
+.pick-group { padding: 10px 12px 4px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+@media (max-width: 300px), (max-height: 330px) { .pick .modal-card.modal-card { border-radius: 0; max-height: 100%; } .modal.pick { padding: 0; } }
